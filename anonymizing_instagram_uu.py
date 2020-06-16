@@ -247,10 +247,10 @@ def _main_usernames(n):
     return (dictionary)
 
 
-def unpack():
+def unpack(input_folder:str):
     """Extract data download packages, i.e., zipfiles, to new folder """
 
-    dir = Path.cwd()
+    dir = Path(input_folder)
 
     zip_files = dir.glob('*.zip')
 
@@ -286,8 +286,17 @@ def main_key():
         print('The anonymized data is saved in the following folder: ' + f'{_main_files(n)[0]}' + '\\' + f'{subt}')
 
 
+def main():
+    parser = argparse.ArgumentParser(description='Anonymize text in Instagram data download package.')
+    parser.add_argument("--input_folder", "-i", help="Input folder containing zipfiles",
+                        default=".")
+
+    args = parser.parse_args()
+
+    unpack(args.input_folder)
+    # main_key()
+
 if __name__ == '__main__':
 
-    unpack()
+    main()
 
-    # main_key()
