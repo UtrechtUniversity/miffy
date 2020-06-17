@@ -6,6 +6,7 @@ import re
 from zipfile import ZipFile
 import pandas as pd
 from anonymize import Anonymize
+from random import shuffle
 
 
 def unpack(input_folder:str, output_folder:str):
@@ -24,6 +25,45 @@ def unpack(input_folder:str, output_folder:str):
             print(f'Extracting to {new_folder}')
             zip.extractall(new_folder)
             print('Done!')
+
+
+def mingle(word):
+    word = list(word)
+    
+    number = []
+    for i in word:
+        if isinstance(i, int):
+            next
+        if i.isalpha():
+            number.append(ord(i)) 
+    
+    letters = []
+    for i in range(len(number)):
+        letter = chr((number[i]+i))
+        if letter.isalpha(): 
+            letters.append(letter)
+        else:
+            letters.append(number[i])
+            
+    numbers = []
+    for i in number:
+        numbers.append(i - 96)
+        
+    new = []
+    round = 0
+    for i in range(len(numbers)):
+        round = round + 1
+        if round == 1:
+            new.append('__')
+        elif round != len(numbers):
+            if isinstance(letters[i], int):
+                next
+            elif letters[i].isalpha():
+                new.append(letters[i])
+        else:
+            new.append(f'{numbers[i]}')
+            
+    return ''.join(new)
 
 
 def usernames(input_folder:str, output_folder:str):
@@ -60,20 +100,13 @@ def usernames(input_folder:str, output_folder:str):
     
         connections = connections.index.values.tolist()
     
-        # Create scramble function
-        from random import shuffle
-    
-        def shuffle_word(word):
-            word = list(word)
-            shuffle(word)
-            return ''.join(word)
-    
         # Create dictionary with original username as key
         dictionary = {}
-        dictionary = {user['username'][0]: ('__' + shuffle_word(user['username'][0]))}
+        username = user['username'][0]
+        dictionary = {username: mingle(f'{username}')}
     
         for name in connections:
-            new = {name: ('__' + shuffle_word(name))}
+            new = {name: mingle(name)}
             dictionary.update(new)
             
             
@@ -162,7 +195,7 @@ def usernames(input_folder:str, output_folder:str):
             if name in dictionary:
                 next
             else:
-                dictionary.update({name: ('__' + shuffle_word(name))})
+                dictionary.update({name: mingle(name)})
     
     
         # FIND FIRST NAMES
@@ -189,12 +222,12 @@ def usernames(input_folder:str, output_folder:str):
                     name = contacts['first_name'][contact]
                     lastname = contacts['last_name'][contact]
                     if lastname != '' and name != '':
-                        new = {name: ('__' + shuffle_word(name))}
+                        new = {name: mingle(name)}
                         new2 = {lastname: new[name]}
                         dictionary.update(new)
                         dictionary.update(new2)
                     elif lastname == '' and name != '' :
-                        new = {name: ('__' + shuffle_word(name))}
+                        new = {name: mingle(name)}
                         dictionary.update(new)
                     
         elif (os.path.exists(json_files[11])):
@@ -209,12 +242,12 @@ def usernames(input_folder:str, output_folder:str):
                     name = contacts['first_name'][contact]
                     lastname = contacts['last_name'][contact]
                     if lastname != '' and name != '':
-                        new = {name: ('__' + shuffle_word(name))}
+                        new = {name: mingle(name)}
                         new2 = {lastname: new[name]}
                         dictionary.update(new)
                         dictionary.update(new2)
                     elif lastname == '' and name != '' :
-                        new = {name: ('__' + shuffle_word(name))}
+                        new = {name: mingle(name)}
                         dictionary.update(new)
         
         # Look for most common names
@@ -249,7 +282,7 @@ def usernames(input_folder:str, output_folder:str):
                 round = round + 1
     
         for name in found_names:
-            dictionary.update({name: '__' + shuffle_word(name)})
+            dictionary.update({name: mingle(name)})
     
     
         # FIND PHONE NUMBERS
