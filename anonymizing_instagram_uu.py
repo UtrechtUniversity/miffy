@@ -166,7 +166,6 @@ class AnonymizeInstagram:
         # Create dictionary with original username and mingled substitute
         participants = self.read_participants()
         dictionary = {}
-        
         for name in username:
             col = list(participants.columns)
             if name not in list(participants[col[0]]) and name.lower() is not 'instagram':
@@ -220,8 +219,12 @@ class AnonymizeInstagram:
 
         # Search for (the most) common names in saved usernames
         path = Path(self.input_folder) / 'Firstnames_NL.lst'
-        firstnames = pd.DataFrame(open(path).read().split('\n'))[0]
-        firstnames = firstnames.drop(firstnames.index[len(firstnames) - 1])
+        file = pd.DataFrame(open(path).read().split('\n'))[0]
+
+        firstnames = []
+        for i in file:
+            if len(i) > 2:
+                firstnames.append(i)
 
         for name in firstnames:
             if name.lower() in str(df).lower():
@@ -358,7 +361,7 @@ class AnonymizeInstagram:
         print('--- Searching ---')
 
         dire = Path(self.output_folder)
-        
+
         row_count = 0
         for row in dire.glob('*'):
             row_count += 1
@@ -406,9 +409,7 @@ class AnonymizeInstagram:
             tot = len(path_list_jpg)
             widgets = [progressbar.Percentage(), progressbar.Bar()]
             bar = progressbar.ProgressBar(widgets=widgets, max_value=tot).start()
-            
             for i in range(tot):
-                
                 # Blur faces on images
                 img = cv.imread(path_list_jpg[i])
                 frame_bf = mfbf.find_blur_faces(img)
@@ -416,7 +417,8 @@ class AnonymizeInstagram:
                 # Blur text on the images that already contain blurred faces
                 frame_bt = mfbt.find_text_and_blur(
                     frame_bf,
-                    eastPath="frozen_east_text_detection.pb",
+                    #eastPath="frozen_east_text_detection.pb",
+                    net = cv.dnn.readNet("frozen_east_text_detection.pb"),
                     min_confidence=0.5)
 
                 cv.imwrite(path_list_jpg[i], frame_bt)
@@ -434,12 +436,12 @@ class AnonymizeInstagram:
             tot = len(path_list_mp4)
             widgets = [progressbar.Percentage(), progressbar.Bar()]
             bar = progressbar.ProgressBar(widgets=widgets, max_value=tot).start()
-            
             for i in range(tot):
 
                 cap = cv.VideoCapture(path_list_mp4[i])
                 total_frames = int(cap.get(cv.CAP_PROP_FRAME_COUNT))
                 img_array = []
+                net = cv.dnn.readNet("frozen_east_text_detection.pb")
 
                 for g in range(total_frames):
                     cap.set(1, g - 1);
@@ -449,11 +451,10 @@ class AnonymizeInstagram:
                     # if ret == True:
                     # blur faces on frame
                     frame_bf = mfbf.find_blur_faces(image)
-                    
                     # blur text on frame
                     frame_bt = mfbt.find_text_and_blur(
                         frame_bf,
-                        eastPath="frozen_east_text_detection.pb",
+                        net,
                         min_confidence=0.5)
 
                     img_array.append(frame_bt)
@@ -498,7 +499,6 @@ class AnonymizeInstagram:
         print("Anonymizing all packages...")
         widgets = [progressbar.Percentage(), progressbar.Bar()]
         bar = progressbar.ProgressBar(widgets=widgets, max_value=len(tot)).start()
-        
         for i in range(len(tot)):
 
             # Replacing sensitive info with substitute indicated in key file
@@ -526,7 +526,6 @@ class AnonymizeInstagram:
             bar.update(i + 1)
 
         bar.finish()
-        
         print(" ")
         print("Done! :) ")
 
