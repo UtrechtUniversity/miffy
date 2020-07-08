@@ -8,6 +8,9 @@ To clone this repository, you'll need Git installed on your computer.
 
 Obtain your data download package as a zipped folder and move it to the input folder
 
+Download a pretrained version of the EAST model [here](https://www.pyimagesearch.com/2018/08/20/opencv-text-detection-east-text-detector/).
+Once you have cloned this repository, place the model in the same folder as the anonymization script.
+
 
 ## Installing
 
@@ -32,6 +35,11 @@ $ python anonymizing_instagram_uu.py -i ./input/ -o ./output
 ```
 
 The output will be a copy of the zipped data download package with all usernames and email addresses anonymized.
+
+## Built With
+
+The blurring of text in images and videos is based on a pre-trained version of the [EAST model](https://github.com/argman/EAST).
+
 
 
 ## Authors
