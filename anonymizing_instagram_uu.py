@@ -333,19 +333,15 @@ class AnonymizeInstagram:
         print('--- Unpacking ---')
 
         dir = Path(self.input_folder)
-        zip_files = dir.glob('*.zip')
-
-        tot = []
-        for file in zip_files:
-            tot.append(file)
+        zip_list = list(dir.glob('*.zip'))
 
         print("Unpacking all packages...")
         widgets = [progressbar.Percentage(), progressbar.Bar()]
-        bar = progressbar.ProgressBar(widgets=widgets, max_value=len(tot)).start()
-        for index in range(len(tot)):
-            new_folder = Path(self.output_folder, tot[index].stem.split('_')[0])
+        bar = progressbar.ProgressBar(widgets=widgets, max_value=len(zip_list)).start()
+        for index, zip_file in enumerate(zip_list):
+            new_folder = Path(self.output_folder, zip_file.stem.split('_')[0])
 
-            with ZipFile(tot[index], 'r') as zip:
+            with ZipFile(zip_file, 'r') as zip:
                 zip.extractall(new_folder)
 
             time.sleep(1)
@@ -402,16 +398,14 @@ class AnonymizeInstagram:
 
             # Blur photos
             print("Blurring photos...")
-            path_list_jpg = [os.path.join(dirpath, filename) for dirpath, _, filenames in os.walk(folder) for filename
-                             in
-                             filenames if filename.endswith('.jpg')]
 
-            tot = len(path_list_jpg)
+            jpg_list = list(folder.rglob('*.jpg'))
+
             widgets = [progressbar.Percentage(), progressbar.Bar()]
-            bar = progressbar.ProgressBar(widgets=widgets, max_value=tot).start()
-            for i in range(tot):
+            bar = progressbar.ProgressBar(widgets=widgets, max_value=len(jpg_list)).start()
+            for index,jpg in enumerate(jpg_list):
                 # Blur faces on images
-                img = cv.imread(path_list_jpg[i])
+                img = cv.imread(str(jpg))
                 frame_bf = mfbf.find_blur_faces(img)
 
                 # Blur text on the images that already contain blurred faces
@@ -421,24 +415,22 @@ class AnonymizeInstagram:
                     net = cv.dnn.readNet("frozen_east_text_detection.pb"),
                     min_confidence=0.5)
 
-                cv.imwrite(path_list_jpg[i], frame_bt)
+                cv.imwrite(str(jpg), frame_bt)
                 time.sleep(0.1)
-                bar.update(i + 1)
+                bar.update(index + 1)
 
             bar.finish()
 
             # Blur videos
             print("Blurring videos (can take a while)...")
-            path_list_mp4 = [os.path.join(dirpath, filename) for dirpath, _, filenames in os.walk(folder) for filename
-                             in
-                             filenames if filename.endswith('.mp4')]
 
-            tot = len(path_list_mp4)
+            mp4_list = list(folder.rglob('*.mp4'))
+
             widgets = [progressbar.Percentage(), progressbar.Bar()]
-            bar = progressbar.ProgressBar(widgets=widgets, max_value=tot).start()
-            for i in range(tot):
+            bar = progressbar.ProgressBar(widgets=widgets, max_value=len(mp4_list)).start()
+            for index,mp4 in enumerate(mp4_list):
 
-                cap = cv.VideoCapture(path_list_mp4[i])
+                cap = cv.VideoCapture(str(mp4))
                 total_frames = int(cap.get(cv.CAP_PROP_FRAME_COUNT))
                 img_array = []
                 net = cv.dnn.readNet("frozen_east_text_detection.pb")
@@ -464,7 +456,7 @@ class AnonymizeInstagram:
                 height, width, layers = image.shape
                 size = (width, height)
 
-                out = cv.VideoWriter(path_list_mp4[i][:-4] + '.mp4', cv.VideoWriter_fourcc(*'DIVX'), 15, size)
+                out = cv.VideoWriter(str(mp4)[:-4] + '.mp4', cv.VideoWriter_fourcc(*'DIVX'), 15, size)
 
                 # store the blurred video
                 for f in range(len(img_array)):
@@ -473,7 +465,7 @@ class AnonymizeInstagram:
 
                 out.release()
                 time.sleep(0.1)
-                bar.update(i + 1)
+                bar.update(index + 1)
 
             bar.finish()
 
@@ -490,40 +482,37 @@ class AnonymizeInstagram:
         col = list(part.columns)
 
         dir = Path(self.output_folder)
-        folders = dir.glob('*')
+        file_list = list(dir.glob('*'))
 
-        tot = []
-        for file in folders:
-            tot.append(file)
 
         print("Anonymizing all packages...")
         widgets = [progressbar.Percentage(), progressbar.Bar()]
-        bar = progressbar.ProgressBar(widgets=widgets, max_value=len(tot)).start()
-        for i in range(len(tot)):
+        bar = progressbar.ProgressBar(widgets=widgets, max_value=len(file_list).start())
+        for index,file in enumerate(file_list):
 
             # Replacing sensitive info with substitute indicated in key file
-            sub = list(part[col[1]][part[col[0]] == tot[i].stem])[0]
+            sub = list(part[col[1]][part[col[0]] == file.stem])[0]
             import_path = Path(self.input_folder, 'keys' + f"_{sub}.csv")
             if self.replace_sens.lower() == 'n':
                 anonymize_csv = Anonymize(import_path, use_word_boundaries=True, flags=re.IGNORECASE)
             else:
                 anonymize_csv = Anonymize(import_path, use_word_boundaries=True)
 
-            anonymize_csv.substitute(tot[i])
+            anonymize_csv.substitute(file)
 
             # Removing unnecesseray files
             delete_path = Path(self.output_folder, sub)
 
-            files = ['autofill.json', 'uploaded_contacts.json', 'contacts.json', 'account_history.json', 'devices.json',
+            json_list = ['autofill.json', 'uploaded_contacts.json', 'contacts.json', 'account_history.json', 'devices.json',
                      'information_about_you.json', 'checkout.json']
-            for file in files:
+            for json_file in json_list:
                 try:
-                    file_to_rem = Path(delete_path, file)
+                    file_to_rem = Path(delete_path, json_file)
                     file_to_rem.unlink()
                 except FileNotFoundError:
                     next
 
-            bar.update(i + 1)
+            bar.update(index + 1)
 
         bar.finish()
         print(" ")
