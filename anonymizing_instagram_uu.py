@@ -396,6 +396,12 @@ class AnonymizeInstagram:
             export_path = Path(self.input_folder, 'keys' + f"_{subt}.csv")
             dic.to_csv(export_path, index=False, encoding='utf-8')
 
+    def blur_images(self):
+        """Blur text and faces in images in given folder """
+
+        dir = Path(self.output_folder)
+
+        for folder in dir.glob('*'):
             # Blur photos
             print("Blurring photos...")
 
@@ -421,6 +427,12 @@ class AnonymizeInstagram:
 
             bar.finish()
 
+    def blur_videos(self):
+        """Blur text and faces in videos in given folder """
+
+        dir = Path(self.output_folder)
+
+        for folder in dir.glob('*'):
             # Blur videos
             print("Blurring videos (can take a while)...")
 
@@ -533,6 +545,8 @@ def main():
 
     instanonym.unpack()
     instanonym.create_keys()
+    instanonym.blur_images()
+    instanonym.blur_videos()
     instanonym.anonymize()
 
 
