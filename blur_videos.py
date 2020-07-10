@@ -10,62 +10,54 @@ import numpy as np
 class BlurVideos:
     """ Blur text and faces in videos in given folder """
 
-    def __init__(self, input_folder: Path, output_folder: Path):
-        self.input_folder = Path(input_folder)
-        self.output_folder = Path(output_folder)
+    def __init__(self, data_package: Path):
+        self.data_package = data_package
 
     def blur_videos(self):
         """Blur text and faces in videos in given folder """
 
-        for folder in self.output_folder.glob('*'):
-            # Blur videos
-            print("Blurring videos (can take a while)...")
+        print("Blurring videos (can take a while)...")
 
-            mp4_list = list(folder.rglob('*.mp4'))
+        mp4_list = list(self.data_package.rglob('*.mp4'))
 
-            widgets = [progressbar.Percentage(), progressbar.Bar()]
-            bar = progressbar.ProgressBar(widgets=widgets, max_value=len(mp4_list)).start()
-            for index, mp4 in enumerate(mp4_list):
+        widgets = [progressbar.Percentage(), progressbar.Bar()]
+        bar = progressbar.ProgressBar(widgets=widgets, max_value=len(mp4_list)).start()
+        for index, mp4 in enumerate(mp4_list):
 
-                cap = cv.VideoCapture(str(mp4))
-                total_frames = int(cap.get(cv.CAP_PROP_FRAME_COUNT))
-                img_array = []
-                net = cv.dnn.readNet("frozen_east_text_detection.pb")
+            cap = cv.VideoCapture(str(mp4))
+            total_frames = int(cap.get(cv.CAP_PROP_FRAME_COUNT))
+            img_array = []
+            net = cv.dnn.readNet("frozen_east_text_detection.pb")
 
-                for g in range(total_frames):
-                    cap.set(1, g - 1)
-                    success = cap.grab()
-                    ret, image = cap.retrieve()
+            for g in range(total_frames):
+                cap.set(1, g - 1)
+                success = cap.grab()
+                ret, image = cap.retrieve()
 
-                    # if ret == True:
-                    # blur faces on frame
-                    frame_bf = mfbf.find_blur_faces(image)
-                    # blur text on frame
-                    frame_bt = mfbt.find_text_and_blur(
-                        frame_bf,
-                        net,
-                        min_confidence=0.5)
+                # if ret == True:
+                # blur faces on frame
+                frame_bf = mfbf.find_blur_faces(image)
+                # blur text on frame
+                frame_bt = mfbt.find_text_and_blur(frame_bf,net,min_confidence=0.5)
 
-                    img_array.append(frame_bt)
+                img_array.append(frame_bt)
 
-                    # else:
+                # else:
 
-                height, width, layers = image.shape
-                size = (width, height)
+            height, width, layers = image.shape
+            size = (width, height)
 
-                out = cv.VideoWriter(str(mp4)[:-4] + '.mp4', cv.VideoWriter_fourcc(*'DIVX'), 15, size)
+            out = cv.VideoWriter(str(mp4)[:-4] + '.mp4', cv.VideoWriter_fourcc(*'DIVX'), 15, size)
 
-                # store the blurred video
-                for f in range(len(img_array)):
-                    cvimage = np.array(img_array[f])
-                    out.write(cvimage)
+            # store the blurred video
+            for f in range(len(img_array)):
+                cvimage = np.array(img_array[f])
+                out.write(cvimage)
 
-                out.release()
-                time.sleep(0.1)
-                bar.update(index + 1)
+            out.release()
+            time.sleep(0.1)
+            bar.update(index + 1)
 
-            bar.finish()
-
-            print(' ')
+        bar.finish()
 
         print(' ')

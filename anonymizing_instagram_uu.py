@@ -1,6 +1,5 @@
 import argparse
 from pathlib import Path
-import json
 import re
 from zipfile import ZipFile
 import pandas as pd
@@ -10,13 +9,14 @@ import os
 import time
 import progressbar
 from create_keys import CreateKeys
-
+from blur_images import BlurImages
+from blur_videos import BlurVideos
 
 
 class AnonymizeInstagram:
     """ Detect and anonymize personal information in Instagram text files"""
 
-    def __init__(self, output_folder: Path,input_folder: Path,zip_file:Path,cap:bool=False):
+    def __init__(self, output_folder: Path, input_folder: Path, zip_file: Path, cap: bool = False):
         self.zip_file = zip_file
         self.input_folder = input_folder
         self.output_folder = output_folder
@@ -36,13 +36,16 @@ class AnonymizeInstagram:
         return unpacked
 
     def inspect_files(self):
-        """ Detect all sensitive information in files from data package"""
+        """ Detect all sensitive information in files from given data package"""
 
-        print(f'Inspecting data package {self.unpacked}---')
-        keys = CreateKeys(self.unpacked,self.input_folder,self.output_folder)
+        keys = CreateKeys(self.unpacked, self.input_folder, self.output_folder)
         keys.create_keys()
-        #instanonym.blur_images()
-        #instanonym.blur_videos()
+
+        #images = BlurImages(self.unpacked)
+        #images.blur_images()
+
+        videos = BlurVideos(self.unpacked)
+        videos.blur_videos()
 
     def read_participants(self):
         """ Open file with all participant numbers """
@@ -65,11 +68,10 @@ class AnonymizeInstagram:
         dir = Path(self.output_folder)
         file_list = list(dir.glob('*'))
 
-
         print("Anonymizing all packages...")
         widgets = [progressbar.Percentage(), progressbar.Bar()]
         bar = progressbar.ProgressBar(widgets=widgets, max_value=len(file_list).start())
-        for index,file in enumerate(file_list):
+        for index, file in enumerate(file_list):
 
             # Replacing sensitive info with substitute indicated in key file
             sub = list(part[col[1]][part[col[0]] == file.stem])[0]
@@ -77,15 +79,16 @@ class AnonymizeInstagram:
             if self.cap:
                 anonymize_csv = Anonymize(import_path, use_word_boundaries=True)
             else:
-                anonymize_csv = Anonymize(import_path, use_word_boundaries=True,flags=re.IGNORECASE)
+                anonymize_csv = Anonymize(import_path, use_word_boundaries=True, flags=re.IGNORECASE)
 
             anonymize_csv.substitute(file)
 
             # Removing unnecesseray files
             delete_path = Path(self.output_folder, sub)
 
-            json_list = ['autofill.json', 'uploaded_contacts.json', 'contacts.json', 'account_history.json', 'devices.json',
-                     'information_about_you.json', 'checkout.json']
+            json_list = ['autofill.json', 'uploaded_contacts.json', 'contacts.json', 'account_history.json',
+                         'devices.json',
+                         'information_about_you.json', 'checkout.json']
             for json_file in json_list:
                 try:
                     file_to_rem = Path(delete_path, json_file)
@@ -110,7 +113,6 @@ def main():
                         help="Replace capitalized names only (i.e., replacing 'Ben' but not 'ben')")
     args = parser.parse_args()
 
-
     input_folder = Path(args.input_folder)
     output_folder = Path(args.output_folder)
     output_folder.mkdir(parents=True, exist_ok=True)
@@ -122,18 +124,13 @@ def main():
 
     for index, zip_file in enumerate(zip_list):
         print(" ")
-        instanonym = AnonymizeInstagram(output_folder, input_folder,zip_file,args.cap)
+        instanonym = AnonymizeInstagram(output_folder, input_folder, zip_file, args.cap)
         instanonym.inspect_files()
 
         time.sleep(1)
         bar.update(index + 1)
 
     bar.finish()
-
-    print(" ")
-    #instanonym.unpack()
-
-    #instanonym.anonymize()
 
 
 if __name__ == '__main__':
