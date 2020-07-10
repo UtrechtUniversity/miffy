@@ -1,0 +1,9 @@
+anonymize-UU==0.1.5
+facenet-pytorch==2.2.9
+numpy==1.17.2
+opencv-python==4.2.0.34
+pandas==0.25.1
+pathlib==1.0.1
+torch==1.5.1
+torchvision==0.6.1
+zipp==0.6.0
