@@ -47,6 +47,8 @@ class AnonymizeInstagram:
         videos = BlurVideos(self.unpacked)
         videos.blur_videos()
 
+        anonymize()
+
     def read_participants(self):
         """ Open file with all participant numbers """
 
@@ -60,15 +62,13 @@ class AnonymizeInstagram:
     def anonymize(self):
         """ Find sensitive info as described in key file and replace it with anonymized substitute """
 
-        print('--- Anonymizing ---')
-
         part = self.read_participants()
         col = list(part.columns)
 
-        dir = Path(self.output_folder)
+        dir = Path(self.unpacked)
         file_list = list(dir.glob('*'))
 
-        print("Anonymizing all packages...")
+        logging.getLogger().info("Anonymizing all files...")
         widgets = [progressbar.Percentage(), progressbar.Bar()]
         bar = progressbar.ProgressBar(widgets=widgets, max_value=len(file_list).start())
         for index, file in enumerate(file_list):
@@ -93,8 +93,9 @@ class AnonymizeInstagram:
                 try:
                     file_to_rem = Path(delete_path, json_file)
                     file_to_rem.unlink()
-                except FileNotFoundError:
-                    next
+                except FileNotFoundError as e:
+                    logging.getLogger().error(f"Error {e} occurred while deleting {json_file} ")
+                    continue
 
             bar.update(index + 1)
 
@@ -102,16 +103,42 @@ class AnonymizeInstagram:
         print(" ")
         print("Done! :) ")
 
+def init_logging(log_file: Path) :
+    """
+    Initialise Python logger
+    :param log_file: Path to the log file.
+    """
+    logging.basicConfig(
+        filename=str(log_file),
+        level=logging.INFO,
+        format='[%(asctime)s] {%(threadName)s:%(lineno)d} %(levelname)s - %(message)s',
+        datefmt='%H:%M:%S'
+    )
+    # Log all levels to file
+    logging.getLogger().setLevel(logging.INFO)
+
+    # Set up logging to console
+    console = logging.StreamHandler()
+    formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
+    console.setFormatter(formatter)
+    # console.setLevel(logging.DEBUG)
+
+    # Add the handler to the root logger
+    logging.getLogger().addHandler(console)
 
 def main():
     parser = argparse.ArgumentParser(description='Anonymize files in Instagram data download package.')
-    parser.add_argument("--input_folder", "-i", help="Enter name of folder containing zipfiles",
+    parser.add_argument("--input_folder", "-i", help="Enter path to folder containing zipfiles",
                         default=".")
-    parser.add_argument("--output_folder", "-o", help="Enter name of folder where files will be unpacked",
+    parser.add_argument("--output_folder", "-o", help="Enter path to folder where files will be unpacked",
                         default=".")
+    parser.add_argument("--log_file", "-l", help="Enter path to log file",
+                        default="log_anonym_insta.txt")
     parser.add_argument('--cap', default=True, action='store_true',
                         help="Replace capitalized names only (i.e., replacing 'Ben' but not 'ben')")
     args = parser.parse_args()
+
+    init_logging(Path(args.log))
 
     input_folder = Path(args.input_folder)
     output_folder = Path(args.output_folder)
@@ -123,10 +150,11 @@ def main():
     bar = progressbar.ProgressBar(widgets=widgets, max_value=len(zip_list)).start()
 
     for index, zip_file in enumerate(zip_list):
-        print(" ")
+        logging.getLogger().info(f"Started anonymizing {zip_file}.")
         instanonym = AnonymizeInstagram(output_folder, input_folder, zip_file, args.cap)
         instanonym.inspect_files()
 
+        logging.getLogger().info(f"Finished anonymizing {zip_file}.")
         time.sleep(1)
         bar.update(index + 1)
 

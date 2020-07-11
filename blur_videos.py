@@ -16,7 +16,7 @@ class BlurVideos:
     def blur_videos(self):
         """Blur text and faces in videos in given folder """
 
-        print("Blurring videos (can take a while)...")
+        logging.getLogger().info("Blurring videos (can take a while)...")
 
         mp4_list = list(self.data_package.rglob('*.mp4'))
 
@@ -60,8 +60,8 @@ class BlurVideos:
                 bar.update(index + 1)
 
             except Exception as e:
-                print(f"Exception {e} occurred  while processing {mp4}")
-                print("Skip and go to next mp4")
+                logging.getLogger().error(f"Exception {e} occurred  while processing {mp4}")
+                logging.getLogger().warning("Skip and go to next mp4")
 
                 time.sleep(0.1)
                 bar.update(index + 1)

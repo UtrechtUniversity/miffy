@@ -15,7 +15,7 @@ class BlurImages:
     def blur_images(self):
         """Blur text and faces in images in given folder """
 
-        print(f'Blurring photos of data package {self.data_package}---')
+        logging.getLogger().info(f'Blurring photos of data package {self.data_package}---')
 
         jpg_list = list(self.data_package.rglob('*.jpg'))
 
@@ -40,8 +40,8 @@ class BlurImages:
                 bar.update(index + 1)
 
             except Exception as e:
-                print(f"Exception {e} occurred  while processing {jpg}")
-                print("Skip and go to next jpg")
+                logging.getLogger().error(f"Exception {e} occurred  while processing {jpg}")
+                logging.getLogger().warning("Skip and go to next jpg")
 
                 time.sleep(0.1)
                 bar.update(index + 1)
