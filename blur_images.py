@@ -23,18 +23,29 @@ class BlurImages:
         bar = progressbar.ProgressBar(widgets=widgets, max_value=len(jpg_list)).start()
         for index, jpg in enumerate(jpg_list):
             # Blur faces on images
-            img = cv.imread(str(jpg))
-            frame_bf = mfbf.find_blur_faces(img)
+            try:
+                img = cv.imread(str(jpg))
+                frame_bf = mfbf.find_blur_faces(img)
 
-            # Blur text on the images that already contain blurred faces
-            frame_bt = mfbt.find_text_and_blur(
-                frame_bf,
-                # eastPath="frozen_east_text_detection.pb",
-                net=cv.dnn.readNet("frozen_east_text_detection.pb"),
-                min_confidence=0.5)
+                # Blur text on the images that already contain blurred faces
+                frame_bt = mfbt.find_text_and_blur(
+                    frame_bf,
+                    # eastPath="frozen_east_text_detection.pb",
+                    net=cv.dnn.readNet("frozen_east_text_detection.pb"),
+                    min_confidence=0.5)
 
-            cv.imwrite(str(jpg), frame_bt)
-            time.sleep(0.1)
-            bar.update(index + 1)
+                cv.imwrite(str(jpg), frame_bt)
+
+                time.sleep(0.1)
+                bar.update(index + 1)
+
+            except Exception as e:
+                print(f"Exception {e} occurred  while processing {jpg}")
+                print("Skip and go to next jpg")
+
+                time.sleep(0.1)
+                bar.update(index + 1)
+
+                continue
 
         bar.finish()

@@ -24,40 +24,49 @@ class BlurVideos:
         bar = progressbar.ProgressBar(widgets=widgets, max_value=len(mp4_list)).start()
         for index, mp4 in enumerate(mp4_list):
 
-            cap = cv.VideoCapture(str(mp4))
-            total_frames = int(cap.get(cv.CAP_PROP_FRAME_COUNT))
-            img_array = []
-            net = cv.dnn.readNet("frozen_east_text_detection.pb")
+            try:
+                cap = cv.VideoCapture(str(mp4))
+                total_frames = int(cap.get(cv.CAP_PROP_FRAME_COUNT))
+                img_array = []
+                net = cv.dnn.readNet("frozen_east_text_detection.pb")
 
-            for g in range(total_frames):
-                cap.set(1, g - 1)
-                success = cap.grab()
-                ret, image = cap.retrieve()
+                for g in range(total_frames):
+                    cap.set(1, g - 1)
+                    success = cap.grab()
+                    ret, image = cap.retrieve()
 
-                # if ret == True:
-                # blur faces on frame
-                frame_bf = mfbf.find_blur_faces(image)
-                # blur text on frame
-                frame_bt = mfbt.find_text_and_blur(frame_bf,net,min_confidence=0.5)
+                    # if ret == True:
+                    # blur faces on frame
+                    frame_bf = mfbf.find_blur_faces(image)
+                    # blur text on frame
+                    frame_bt = mfbt.find_text_and_blur(frame_bf,net,min_confidence=0.5)
 
-                img_array.append(frame_bt)
+                    img_array.append(frame_bt)
 
-                # else:
+                    # else:
 
-            height, width, layers = image.shape
-            size = (width, height)
+                height, width, layers = image.shape
+                size = (width, height)
 
-            out = cv.VideoWriter(str(mp4)[:-4] + '.mp4', cv.VideoWriter_fourcc(*'DIVX'), 15, size)
+                out = cv.VideoWriter(str(mp4)[:-4] + '.mp4', cv.VideoWriter_fourcc(*'DIVX'), 15, size)
 
-            # store the blurred video
-            for f in range(len(img_array)):
-                cvimage = np.array(img_array[f])
-                out.write(cvimage)
+                # store the blurred video
+                for f in range(len(img_array)):
+                    cvimage = np.array(img_array[f])
+                    out.write(cvimage)
 
-            out.release()
-            time.sleep(0.1)
-            bar.update(index + 1)
+                out.release()
+                time.sleep(0.1)
+                bar.update(index + 1)
+
+            except Exception as e:
+                print(f"Exception {e} occurred  while processing {mp4}")
+                print("Skip and go to next mp4")
+
+                time.sleep(0.1)
+                bar.update(index + 1)
+
+                continue
 
         bar.finish()
-
         print(' ')

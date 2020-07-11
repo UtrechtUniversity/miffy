@@ -41,8 +41,8 @@ class AnonymizeInstagram:
         keys = CreateKeys(self.unpacked, self.input_folder, self.output_folder)
         keys.create_keys()
 
-        #images = BlurImages(self.unpacked)
-        #images.blur_images()
+        images = BlurImages(self.unpacked)
+        images.blur_images()
 
         videos = BlurVideos(self.unpacked)
         videos.blur_videos()
