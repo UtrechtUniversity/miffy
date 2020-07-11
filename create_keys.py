@@ -329,7 +329,7 @@ class CreateKeys:
                     df.update({f'{json_file}': data})
 
         # Create key file
-        print(f"Creating key file for {self.data_package}...")
+        logging.getLogger().info(f"Creating key file for {self.data_package}...")
         dictionary = self.extr_usernames(df)
         functions = [self.extr_profile, self.extr_names, self.extr_mail, self.extr_phone, self.extr_http]
 
