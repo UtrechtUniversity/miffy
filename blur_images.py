@@ -4,18 +4,20 @@ from pathlib import Path
 import progressbar
 import cv2 as cv
 import time
+import logging
 
 
 class BlurImages:
     """ Blur text and faces in images in given folder """
 
     def __init__(self, data_package: Path):
+        self.logger = logging.getLogger('anonymizing.images')
         self.data_package = data_package
 
     def blur_images(self):
         """Blur text and faces in images in given folder """
 
-        logging.getLogger().info(f'Blurring photos of data package {self.data_package}---')
+        self.logger.info(f'Blurring photos of data package {self.data_package}---')
 
         jpg_list = list(self.data_package.rglob('*.jpg'))
 
@@ -40,8 +42,8 @@ class BlurImages:
                 bar.update(index + 1)
 
             except Exception as e:
-                logging.getLogger().error(f"Exception {e} occurred  while processing {jpg}")
-                logging.getLogger().warning("Skip and go to next jpg")
+                self.logger.error(f"Exception {e} occurred  while processing {jpg}")
+                self.logger.warning("Skip and go to next jpg")
 
                 time.sleep(0.1)
                 bar.update(index + 1)

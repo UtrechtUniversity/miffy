@@ -8,6 +8,7 @@ import string
 import os
 import time
 import progressbar
+import logging
 from create_keys import CreateKeys
 from blur_images import BlurImages
 from blur_videos import BlurVideos
@@ -17,6 +18,7 @@ class AnonymizeInstagram:
     """ Detect and anonymize personal information in Instagram text files"""
 
     def __init__(self, output_folder: Path, input_folder: Path, zip_file: Path, cap: bool = False):
+        self.logger = logging.getLogger('anonymizing')
         self.zip_file = zip_file
         self.input_folder = input_folder
         self.output_folder = output_folder
@@ -27,7 +29,7 @@ class AnonymizeInstagram:
     def unpack(self):
         """Extract data package to output folder """
 
-        print(f'Unpacking zipfile {self.zip_file}---')
+        self.logger.info(f'Unpacking zipfile {self.zip_file}---')
         unpacked = Path(self.output_folder, self.zip_file.stem.split('_')[0])
 
         with ZipFile(self.zip_file, 'r') as zip:
@@ -68,7 +70,7 @@ class AnonymizeInstagram:
         dir = Path(self.unpacked)
         file_list = list(dir.glob('*'))
 
-        logging.getLogger().info("Anonymizing all files...")
+        self.logger.info("Anonymizing all files...")
         widgets = [progressbar.Percentage(), progressbar.Bar()]
         bar = progressbar.ProgressBar(widgets=widgets, max_value=len(file_list).start())
         for index, file in enumerate(file_list):
@@ -94,7 +96,7 @@ class AnonymizeInstagram:
                     file_to_rem = Path(delete_path, json_file)
                     file_to_rem.unlink()
                 except FileNotFoundError as e:
-                    logging.getLogger().error(f"Error {e} occurred while deleting {json_file} ")
+                    self.logger.error(f"Error {e} occurred while deleting {json_file} ")
                     continue
 
             bar.update(index + 1)
@@ -108,23 +110,30 @@ def init_logging(log_file: Path) :
     Initialise Python logger
     :param log_file: Path to the log file.
     """
-    logging.basicConfig(
-        filename=str(log_file),
-        level=logging.INFO,
-        format='[%(asctime)s] {%(threadName)s:%(lineno)d} %(levelname)s - %(message)s',
-        datefmt='%H:%M:%S'
-    )
-    # Log all levels to file
-    logging.getLogger().setLevel(logging.INFO)
+    logger = logging.getLogger('anonymizing')
+    logger.setLevel('INFO')
+
+    # creating a formatter
+    formatter = logging.Formatter('- %(name)s - %(levelname)-8s: %(message)s')
+
+    # set up logging to file
+    fh = logging.FileHandler(log_file, 'w', 'utf-8')
+    fh.setLevel(logging.INFO)
 
     # Set up logging to console
-    console = logging.StreamHandler()
-    formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
-    console.setFormatter(formatter)
-    # console.setLevel(logging.DEBUG)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+
+    # Set handler format
+    fh.setFormatter(formatter)
+    ch.setFormatter(formatter)
 
     # Add the handler to the root logger
-    logging.getLogger().addHandler(console)
+    logger.addHandler(fh)
+    logger.addHandler(ch)
+
+    return logger
+
 
 def main():
     parser = argparse.ArgumentParser(description='Anonymize files in Instagram data download package.')
@@ -138,7 +147,7 @@ def main():
                         help="Replace capitalized names only (i.e., replacing 'Ben' but not 'ben')")
     args = parser.parse_args()
 
-    init_logging(Path(args.log))
+    logger = init_logging(Path(args.log_file))
 
     input_folder = Path(args.input_folder)
     output_folder = Path(args.output_folder)
@@ -150,11 +159,11 @@ def main():
     bar = progressbar.ProgressBar(widgets=widgets, max_value=len(zip_list)).start()
 
     for index, zip_file in enumerate(zip_list):
-        logging.getLogger().info(f"Started anonymizing {zip_file}.")
+        logger.info(f"Started anonymizing {zip_file}.")
         instanonym = AnonymizeInstagram(output_folder, input_folder, zip_file, args.cap)
         instanonym.inspect_files()
 
-        logging.getLogger().info(f"Finished anonymizing {zip_file}.")
+        logger.info(f"Finished anonymizing {zip_file}.")
         time.sleep(1)
         bar.update(index + 1)
 
