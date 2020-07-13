@@ -5,12 +5,14 @@ import pandas as pd
 import string
 import time
 import progressbar
+import logging
 
 
 class CreateKeys:
     """ Detect personal sensitive information in text; create keyfile for user and person names"""
 
     def __init__(self, data_package: Path, input_folder: Path, output_folder: Path):
+        self.logger = logging.getLogger('anonymizing.keys')
         self.data_package = data_package
         self.input_folder = input_folder
         self.output_folder = output_folder
@@ -329,7 +331,7 @@ class CreateKeys:
                     df.update({f'{json_file}': data})
 
         # Create key file
-        logging.getLogger().info(f"Creating key file for {self.data_package}...")
+        self.logger.info(f"Creating key file for {self.data_package}...")
         dictionary = self.extr_usernames(df)
         functions = [self.extr_profile, self.extr_names, self.extr_mail, self.extr_phone, self.extr_http]
 
