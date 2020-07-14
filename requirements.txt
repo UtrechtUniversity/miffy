@@ -7,3 +7,4 @@ pathlib==1.0.1
 torch==1.5.1
 torchvision==0.6.1
 zipp==0.6.0
+progressbar2==3.51.4
