@@ -4,8 +4,6 @@ import re
 from zipfile import ZipFile
 import pandas as pd
 from anonymize import Anonymize
-import string
-import os
 import time
 import progressbar
 import logging
@@ -13,27 +11,48 @@ from create_keys import CreateKeys
 from blur_images import BlurImages
 from blur_videos import BlurVideos
 
-
 class AnonymizeInstagram:
     """ Detect and anonymize personal information in Instagram text files"""
 
-    def __init__(self, output_folder: Path, input_folder: Path, zip_file: Path, cap: bool = False):
+    def __init__(self, output_folder: Path, input_folder: Path, zip_file: Path, part: str, cap: bool = False):
         self.logger = logging.getLogger('anonymizing')
         self.zip_file = zip_file
         self.input_folder = input_folder
         self.output_folder = output_folder
         self.cap = cap
+        self.part = part
 
         self.unpacked = self.unpack()
 
     def unpack(self):
         """Extract data package to output folder """
 
-        self.logger.info(f'Unpacking zipfile {self.zip_file}---')
-        unpacked = Path(self.output_folder, self.zip_file.stem.split('_')[0])
+        try:
+            for zip_file in self.zip_file:
+                self.logger.info(f'Unpacking zipfile {zip_file}...')
 
-        with ZipFile(self.zip_file, 'r') as zip:
-            zip.extractall(unpacked)
+                index = len(self.part)+9
+                pattern = zip_file.name[index:-4]
+                unpacked = Path(self.output_folder, self.part)
+
+                if int(pattern[-1]) == 1:
+                    with ZipFile(zip_file, 'r') as zip:
+                        zip.extractall(unpacked)
+
+                elif int(pattern[-1]) > 1:
+                    with ZipFile(zip_file, 'r') as zipObj:
+                        listOfFileNames = zipObj.namelist()
+                        for fileName in listOfFileNames:
+                            if fileName.endswith('.json'):
+                                if Path(unpacked, fileName).is_file():
+                                    p = Path(unpacked, fileName)
+                                    p.replace(Path(unpacked, f"{p.stem}{pattern[-1]}{p.suffix}"))
+                                zipObj.extract(fileName, unpacked)
+        except TypeError:
+            self.logger.info(f'Unpacking zipfile {self.zip_file}...')
+            unpacked = Path(self.output_folder, self.part)
+            with ZipFile(self.zip_file, 'r') as zip:
+                zip.extractall(unpacked)
 
         return unpacked
 
@@ -49,7 +68,7 @@ class AnonymizeInstagram:
         videos = BlurVideos(self.unpacked)
         videos.blur_videos()
 
-        anonymize()
+        self.anonymize()
 
     def read_participants(self):
         """ Open file with all participant numbers """
@@ -64,46 +83,38 @@ class AnonymizeInstagram:
     def anonymize(self):
         """ Find sensitive info as described in key file and replace it with anonymized substitute """
 
-        part = self.read_participants()
-        col = list(part.columns)
-
-        dir = Path(self.unpacked)
-        file_list = list(dir.glob('*'))
+        participants = self.read_participants()
+        col = list(participants.columns)
+        file = self.unpacked
 
         self.logger.info("Anonymizing all files...")
-        widgets = [progressbar.Percentage(), progressbar.Bar()]
-        bar = progressbar.ProgressBar(widgets=widgets, max_value=len(file_list).start())
-        for index, file in enumerate(file_list):
 
-            # Replacing sensitive info with substitute indicated in key file
-            sub = list(part[col[1]][part[col[0]] == file.stem])[0]
-            import_path = Path(self.input_folder, 'keys' + f"_{sub}.csv")
-            if self.cap:
-                anonymize_csv = Anonymize(import_path, use_word_boundaries=True)
-            else:
-                anonymize_csv = Anonymize(import_path, use_word_boundaries=True, flags=re.IGNORECASE)
+        # Replacing sensitive info with substitute indicated in key file
+        sub = list(participants[col[1]][participants[col[0]] == file.name])[0]
+        import_path = Path(self.input_folder, 'keys' + f"_{sub}.csv")
+        if self.cap:
+            anonymize_csv = Anonymize(import_path, use_word_boundaries=True)
+        else:
+            anonymize_csv = Anonymize(import_path, use_word_boundaries=True, flags=re.IGNORECASE)
 
-            anonymize_csv.substitute(file)
+        anonymize_csv.substitute(file)
 
-            # Removing unnecesseray files
-            delete_path = Path(self.output_folder, sub)
+        # Removing unnecessary files
+        delete_path = Path(self.output_folder, sub)
 
-            json_list = ['autofill.json', 'uploaded_contacts.json', 'contacts.json', 'account_history.json',
-                         'devices.json',
-                         'information_about_you.json', 'checkout.json']
-            for json_file in json_list:
-                try:
-                    file_to_rem = Path(delete_path, json_file)
-                    file_to_rem.unlink()
-                except FileNotFoundError as e:
-                    self.logger.error(f"Error {e} occurred while deleting {json_file} ")
-                    continue
+        # json_list = ['autofill.json', 'uploaded_contacts.json', 'contacts.json', 'account_history.json',
+        #              'devices.json',
+        #              'information_about_you.json', 'checkout.json']
 
-            bar.update(index + 1)
-
-        bar.finish()
-        print(" ")
-        print("Done! :) ")
+        json_list = ['autofill.json', 'uploaded_contacts.json', 'account_history.json',
+                     'devices.json', 'information_about_you.json']
+        for json_file in json_list:
+            try:
+                file_to_rem = Path(delete_path, json_file)
+                file_to_rem.unlink()
+            except FileNotFoundError as e:
+                self.logger.error(f"Error {e} occurred while deleting {json_file} ")
+                continue
 
 def init_logging(log_file: Path) :
     """
@@ -154,16 +165,44 @@ def main():
     output_folder.mkdir(parents=True, exist_ok=True)
 
     zip_list = list(input_folder.glob('*.zip'))
+    part_list = pd.read_csv(Path(input_folder, 'participants.csv'), encoding="utf8", sep = ';')
+    part_list = list(part_list[part_list.columns[0]])
 
     widgets = [progressbar.Percentage(), progressbar.Bar()]
-    bar = progressbar.ProgressBar(widgets=widgets, max_value=len(zip_list)).start()
+    bar = progressbar.ProgressBar(widgets=widgets, max_value=len(part_list)).start()
 
-    for index, zip_file in enumerate(zip_list):
-        logger.info(f"Started anonymizing {zip_file}.")
-        instanonym = AnonymizeInstagram(output_folder, input_folder, zip_file, args.cap)
-        instanonym.inspect_files()
+    for index, parti in enumerate(part_list):
+        part = parti
+        logger.info(f"Started anonymizing {part}:")
 
-        logger.info(f"Finished anonymizing {zip_file}.")
+        if str(zip_list).count(part) == 1:
+            zip_file = re.findall(f'({part}'+'_[0-9]{8}.zip)', str(zip_list))
+            zip_file = Path(input_folder, zip_file[0])
+
+            instanonym = AnonymizeInstagram(output_folder, input_folder, zip_file, part, args.cap)
+            instanonym.inspect_files()
+
+            logger.info(f"Finished anonymizing {part}.")
+
+        elif str(zip_list).count(part) > 1:
+            zip_file = []
+            for zip in zip_list:
+                try:
+                    files = re.findall(f'({part}.*.zip)', str(zip))[0]
+                    zip_file.append(Path(input_folder, files))
+                except:
+                    next
+
+            instanonym = AnonymizeInstagram(output_folder, input_folder, zip_file, part, args.cap)
+            instanonym.inspect_files()
+
+            logger.info(f"Finished anonymizing {part}.")
+
+        else:
+            logger.info(f"No package found for {part}.")
+            next
+
+        print(" ")
         time.sleep(1)
         bar.update(index + 1)
 
