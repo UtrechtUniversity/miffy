@@ -45,8 +45,9 @@ Make sure that the data download package is saved as **username_YYYYMMDD.zip** (
 After the repository is cloned and the data package is downloaded, create a new folder within the cloned repository (e.g., 'input'). Here, the following files need to be saved:
 * **Data package**: All necessary zipped data download packages (username_YYYYMMDD.zip)
 * **First names file**: A list with the most common (Dutch) names (Firstnames_NL.lst)
-* (**Participant file**: An overview of all participants' usernames and participant codes (participants.csv). N.B. Only necessary for participant based studies.)
+* **Participant file**\*: An overview of all participants' usernames and participant codes (participants.csv)
 
+**\*** N.B. Only necessary for participant based studies.
 
 ## Run software
 
@@ -64,12 +65,12 @@ The output of the program will be a copy of the zipped data download package wit
 
 ## Built With
 
-The blurring of text in images and videos is based on a pre-trained version of the [EAST model](https://github.com/argman/EAST).
+The blurring of text in images and videos is based on a pre-trained version of the [EAST model](https://github.com/argman/EAST). Replacing the extracted sensitive info with the pseudonimized substitutes in the data download package is done using the [Anonymize-UU](https://pypi.org/project/anonymize-UU/) package.
 
 
 ## Authors
 
-See also the list of [contributors](https://github.com/your/project/contributors) who participated in this project.
+The Miffy project is executed by Martine de Vos, Laura Boeschoten and Roos Voorvaart in assigment of the University Utrecht. See also the list of [contributors](https://github.com/your/project/contributors) who participated in this project.
 
 
 ## License
@@ -79,4 +80,4 @@ This project is licensed under ...
 
 ## Acknowledgments
 
-* Thank you to all people whose code we've used.
+Thank you to all people whose code we've used.
