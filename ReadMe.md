@@ -25,7 +25,6 @@ $ cd miffy
 
 # Install dependencies
 pip install -r requirements.txt 
-
 ```
 
 ### Download data package
@@ -44,24 +43,23 @@ Make sure that the data download package is saved as **username_YYYYMMDD.zip** (
 ### Input folder
 
 After the repository is cloned and the data package is downloaded, create a new folder within the cloned repository (e.g., 'input'). Here, the following files need to be saved:
-* ***Data package***: Zipped data download package(s) (username_YYYYMMDD.zip)
-* ***First names file***: A list with the most common (Dutch) names (Firstnames_NL.lst)
-* (***Participant file***: Only necessary for participant based studies. In this file, all participants' usernames and participant codes are listed (participants.csv).)
+* **Data package**: All necessary zipped data download packages (username_YYYYMMDD.zip)
+* **First names file**: A list with the most common (Dutch) names (Firstnames_NL.lst)
+* (**Participant file**: An overview of all participants' usernames and participant codes (participants.csv). N.B. Only necessary for participant based studies.)
 
 
 ## Run software
 
-Run the program with arguments `-i` for input folder (e.g., 'input') and ` -o` output folder (e.g., 'output'):
+When all preceding steps are taken, the data download packages can be pseudonimized. Run the program with arguments `-i` for input folder (e.g., 'input') and ` -o` output folder (e.g., 'output'):
 
 ```
 $ python anonymizing_instagram_uu.py -i input -o output
-
 ```
 
-An overview of what the program does is showed below:
+An overview of the program's workflow is shown below:
 ![flowanonymize.png](flowanonymize.png)
 
-The output will be a copy of the zipped data download package with all names, usernames, email addresses, phone numbers anonymized, and pictures and videos blurred. This pseudonimized data download package is saved in the output folder.
+The output of the program will be a copy of the zipped data download package with all names, usernames, email addresses, and phone numbers anonymized, and all pictures and videos blurred. This pseudonimized data download package is saved in the output folder.
 
 
 ## Built With
@@ -81,10 +79,4 @@ This project is licensed under ...
 
 ## Acknowledgments
 
-* Hat tip to anyone whose code was used
-* Inspiration
-* etc
-
-
-
-Download a pretrained version of the EAST model [here](https://www.pyimagesearch.com/2018/08/20/opencv-text-detection-east-text-detector/).
+* Thank you to all people whose code we've used.
