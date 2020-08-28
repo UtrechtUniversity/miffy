@@ -1,5 +1,5 @@
 import argparse
-from pathlib import Path
+from pathlib import Path,PurePath
 import re
 from zipfile import ZipFile
 import pandas as pd
@@ -13,10 +13,12 @@ from typing import Union
 from blur_images import BlurImages
 from blur_videos import BlurVideos
 
+
 class AnonymizeInstagram:
     """ Detect and anonymize personal information in Instagram text files"""
 
-    def __init__(self, output_folder: Path, input_folder: Path, zip_file: Union[Path,list], part: str, cap: bool = False, ptp: bool = False):
+    def __init__(self, output_folder: Path, input_folder: Path, zip_file: Union[Path, list],
+                 part: str, cap: bool = False, ptp: bool = False):
         self.logger = logging.getLogger('anonymizing')
         self.zip_file = zip_file
         self.input_folder = input_folder
@@ -30,37 +32,62 @@ class AnonymizeInstagram:
     def unpack(self):
         """Extract data package to output folder """
 
-        if type(self.zip_file) == Path:
-            print(f'Unpack Path {self.zip_file}')
-            # self.logger.info(f'Unpacking zipfile {self.zip_file}...')
-            # unpacked = Path(self.output_folder, self.zip_file.stem.split('_')[0])
-            # with ZipFile(self.zip_file, 'r') as zip:
-            #     zip.extractall(unpacked)
-        if type(self.zip_file) == list:
-            print(f'Unpack list {self.zip_file}')
-            for index, zip_file in enumerate(self.zip_file):
-                if index == 0:
-                    # Hier komt Roos' code
-                    print(f'Extract first zip {zip_file}')
-                elif index > 0:
-                    print(f'Extract special next zips {zip_file}')
+        try:
+            # Check if variable is a path; statement also valid for other OS
+            if isinstance(self.zip_file,PurePath):
+                unpacked = self.extract()
 
-        #return unpacked
+            elif isinstance(self.zip_file,list):
+                self.logger.info(f'Extracting zipfile {self.zip_file} in {self.output_folder}')
+                for index, zip_file in enumerate(self.zip_file):
+                    if index == 0:
+                        self.zip_file = Path(zip_file)
+                        unpacked = self.extract()
+                    elif index > 0:
+                        self.logger.info(f'Extracting files for {zip_file} in {self.output_folder}'
+                                         f'; replace existing files with name+suffix {index-1}')
+                        with ZipFile(zip_file, 'r') as zipObj:
+                            listOfFileNames = zipObj.namelist()
+                            unpacked = Path(self.output_folder, self.zip_file.stem)
+                            for fileName in listOfFileNames:
+                                if fileName.endswith('.json'):
+                                    if Path(unpacked, fileName).is_file():
+                                        p = Path(unpacked, fileName)
+                                        p.replace(Path(unpacked, f"{p.stem}_{index-1}{p.suffix}"))
+                                    zipObj.extract(fileName, unpacked)
+            else:
+                self.logger.warning('Can not extract {self.zip_file}, do nothing')
+                unpacked = ' '
 
+        except Exception as e:
+            self.logger.error(f"Exception {e} occurred  while processing {self.zip_file}")
+            self.logger.warning("Skip and go to next zip")
+
+        return unpacked
+
+    def extract(self):
+        """Extract data package to output folder """
+        self.logger.info(f'Extracting zipfile {self.zip_file}...')
+        extracted = Path(self.output_folder, self.zip_file.stem)
+        with ZipFile(self.zip_file, 'r') as zip:
+             zip.extractall(extracted)
+
+        return extracted
 
     def inspect_files(self):
         """ Detect all sensitive information in files from given data package"""
 
-        keys = CreateKeys(self.unpacked, self.input_folder, self.output_folder,self.ptp)
+        print(f'Time for inspection')
+        keys = CreateKeys(self.unpacked, self.input_folder, self.output_folder, self.ptp)
         keys.create_keys()
 
-        #images = BlurImages(self.unpacked)
-        #images.blur_images()
+        images = BlurImages(self.unpacked)
+        images.blur_images()
 
-        #videos = BlurVideos(self.unpacked)
-        #videos.blur_videos()
+        videos = BlurVideos(self.unpacked)
+        videos.blur_videos()
 
-        #self.anonymize()
+        self.anonymize()
 
     def read_participants(self):
         """ Open file with all participant numbers """
@@ -108,7 +135,8 @@ class AnonymizeInstagram:
                 self.logger.error(f"Error {e} occurred while deleting {json_file} ")
                 continue
 
-def init_logging(log_file: Path) :
+
+def init_logging(log_file: Path):
     """
     Initialise Python logger
     :param log_file: Path to the log file.
@@ -167,32 +195,27 @@ def main():
 
     ext_zip_list = []
     for zip_file in zip_list:
+        # Regular pattern of zipfile for Insta DDP
         res = re.match(patt + '.zip', str(zip_file.name))
         if res:
-            print(f'Instanonymize regular {zip_file}')
-            instanonym = AnonymizeInstagram(output_folder, input_folder, zip_file, args.cap,args.ptp)
-            # Zipfiles in collection have: patt+suffix+.zip
+            instanonym = AnonymizeInstagram(output_folder, input_folder, zip_file, args.cap, args.ptp)
         else:
+            # Zipfiles in collection have a suffix, like usr_timestamp_part1.zip
             ext_zip_list.append(zip_file)
 
-    ext_zip_str = [str(i.name) for i in ext_zip_list]
+    ext_zip_str = [str(i) for i in ext_zip_list]
     ext_zip_str.sort()
     grp_ext_zip = [list(g) for _, g in itertools.groupby(ext_zip_str, lambda x: x.partition('_')[0])]
 
     for zip_grp in grp_ext_zip:
-        # Account for unique zipfiles who do not meet pattern
+        # Account for unique zipfiles that do not meet regular pattern
         if len(zip_grp) == 1:
-            print(f'Instanonymize weird pattern {zip_grp[0]}')
             instanonym = AnonymizeInstagram(output_folder, input_folder, Path(zip_grp[0]), args.cap, args.ptp)
         elif len(zip_grp) > 1:
-            print(f'Unpack group {zip_grp}')
+            logger.info(f'Collection of files found with same user + timestamp: {zip_grp}')
             instanonym = AnonymizeInstagram(output_folder, input_folder, zip_grp, args.cap, args.ptp)
 
-
-
-            #instanonym.inspect_files()
-
-
+    #instanonym.inspect_files()
 
 
 if __name__ == '__main__':
