@@ -62,11 +62,11 @@ class AnonymizeInstagram:
         keys = CreateKeys(self.unpacked, self.input_folder, self.output_folder)
         keys.create_keys()
 
-        images = BlurImages(self.unpacked)
-        images.blur_images()
-
-        videos = BlurVideos(self.unpacked)
-        videos.blur_videos()
+        # images = BlurImages(self.unpacked)
+        # images.blur_images()
+        #
+        # videos = BlurVideos(self.unpacked)
+        # videos.blur_videos()
 
         self.anonymize()
 
@@ -101,10 +101,6 @@ class AnonymizeInstagram:
 
         # Removing unnecessary files
         delete_path = Path(self.output_folder, sub)
-
-        # json_list = ['autofill.json', 'uploaded_contacts.json', 'contacts.json', 'account_history.json',
-        #              'devices.json',
-        #              'information_about_you.json', 'checkout.json']
 
         json_list = ['autofill.json', 'uploaded_contacts.json', 'account_history.json',
                      'devices.json', 'information_about_you.json']
