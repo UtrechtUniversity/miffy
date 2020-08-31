@@ -9,12 +9,14 @@ import hashlib
 class CreateKeys:
     """ Detect personal sensitive information in text; create keyfile for user and person names"""
 
-    def __init__(self, data_package: Path, input_folder: Path, output_folder: Path, ptp: bool = False):
+    # def __init__(self, data_package: Path, input_folder: Path, output_folder: Path, , ptp: bool = False):
+    def __init__(self, data_package: Path, input_folder: Path, output_folder: Path):
+
         self.logger = logging.getLogger('anonymizing.keys')
         self.data_package = data_package
         self.input_folder = input_folder
         self.output_folder = output_folder
-        self.ptp = ptp
+        # self.ptp = ptp
 
     def mingle(self, word):
         """ Creates scrambled version with letters and numbers of entered word """
@@ -26,7 +28,9 @@ class CreateKeys:
 
         return pseudo
 
-    def read_participants(self) -> dict:
+    # def read_participants(self) -> dict:
+    def read_participants(self):
+
         """ Create dictionary with participant names and numbers """
 
         path = Path(self.input_folder) / 'participants.csv'
@@ -34,10 +38,12 @@ class CreateKeys:
         if len(participants.columns):
             participants = pd.read_csv(path, encoding="utf8", sep=';')
 
-        participants = participants.set_index(participants.columns[0])
-        dictionary = participants.to_dict()[participants.columns[0]]
+        # participants = participants.set_index(participants.columns[0])
+        # dictionary = participants.to_dict()[participants.columns[0]]
+        #
+        # return dictionary
 
-        return dictionary
+        return participants
 
     def extr_profile(self, df):
         """Extract all profile information from entered file """
@@ -80,9 +86,9 @@ class CreateKeys:
 
         username.extend(list(df_users.index))
 
-        for col in df_search.columns:
+        for col in df_saved.columns:
             try:
-                username.extend(list(df_search[col].dropna(how='all')))
+                username.extend([item[1] for item in list(df_search[col].dropna(how = 'all'))])
             except:
                 next
 
@@ -124,24 +130,35 @@ class CreateKeys:
                 next
 
         # Create dictionary with original username and mingled substitute
-        if self.ptp :
-            self.logger.info(f"Reading participants file")
-            dictionary = self.read_participants()
-            for name in set(username):
-                try:
-                    if name not in dictionary and name.lower() is not 'instagram':
-                        dictionary.update({name: self.mingle(name)})
-                except AttributeError:
-                    next
-        else:
-            self.logger.info(f"No participants file")
-            dictionary = {}
-            for name in set(username):
-                try:
-                    if name.lower() is not 'instagram':
-                        dictionary.update({name: self.mingle(name)})
-                except AttributeError:
-                    next
+        # if self.ptp:
+        #     self.logger.info(f"Reading participants file")
+        #     dictionary = self.read_participants()
+        #     for name in set(username):
+        #         try:
+        #             if name not in dictionary and name.lower() is not 'instagram':
+        #                 dictionary.update({name: self.mingle(name)})
+        #         except AttributeError:
+        #             next
+        # else:
+        #     self.logger.info(f"No participants file")
+        #     dictionary = {}
+        #     for name in set(username):
+        #         try:
+        #             if name.lower() is not 'instagram':
+        #                 dictionary.update({name: self.mingle(name)})
+        #         except AttributeError:
+        #             next
+
+        participants = self.read_participants()
+        participants = participants.set_index(participants.columns[0])
+        dictionary = participants.to_dict()[participants.columns[0]]
+
+        for name in set(username):
+            try:
+                if name not in dictionary and name.lower() is not 'instagram':
+                    dictionary.update({name: self.mingle(name)})
+            except AttributeError:
+                next
 
         return dictionary
 
