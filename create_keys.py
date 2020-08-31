@@ -86,9 +86,9 @@ class CreateKeys:
 
         username.extend(list(df_users.index))
 
-        for col in df_saved.columns:
+        for col in df_search.columns:
             try:
-                username.extend([item[1] for item in list(df_search[col].dropna(how = 'all'))])
+                username.extend([item for item in list(df_search[col].dropna(how = 'all'))])
             except:
                 next
 
