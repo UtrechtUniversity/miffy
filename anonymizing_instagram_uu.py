@@ -90,34 +90,41 @@ class AnonymizeInstagram:
 
         self.anonymize()
 
-    def read_participants(self):
-        """ Open file with all participant numbers """
+    def read_participants(self) -> dict:
+        """ Create dictionary with participant names and numbers """
 
         path = Path(self.input_folder) / 'participants.csv'
         participants = pd.read_csv(path, encoding="utf8")
         if len(participants.columns):
             participants = pd.read_csv(path, encoding="utf8", sep=';')
 
-        return participants
+        participants = participants.set_index(participants.columns[0])
+        dictionary = participants.to_dict()[participants.columns[0]]
+
+        return dictionary
 
     def anonymize(self):
         """ Find sensitive info as described in key file and replace it with anonymized substitute """
 
-        participants = self.read_participants()
-        col = list(participants.columns)
-        file = self.unpacked
-
         self.logger.info("Anonymizing all files...")
 
+        own_name = str(self.unpacked.name).partition('_')[0]
+
         # Replacing sensitive info with substitute indicated in key file
-        sub = list(participants[col[1]][participants[col[0]] == file.name])[0]
-        import_path = Path(self.input_folder, 'keys' + f"_{sub}.csv")
+        if self.ptp:
+            part_dic = self.read_participants()
+            sub = part_dic[own_name]
+        else:
+            sub = own_name
+
+        import_path = Path(self.input_folder, 'keys' + f"_{own_name}.csv")
+
         if self.cap:
             anonymize_csv = Anonymize(import_path, use_word_boundaries=True)
         else:
             anonymize_csv = Anonymize(import_path, use_word_boundaries=True, flags=re.IGNORECASE)
 
-        anonymize_csv.substitute(file)
+        anonymize_csv.substitute(self.unpacked)
 
         # Removing unnecessary files
         delete_path = Path(self.output_folder, sub)
