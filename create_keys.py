@@ -353,6 +353,8 @@ class CreateKeys:
         dic = pd.DataFrame(list(dictionary.items()))
         dic = dic.rename(columns={0: 'id', 1: 'subt'})
 
-        subt = dictionary[f'{self.data_package.name}']
+        # remove timestamp to retrieve name of package owner
+        own_name = str(self.data_package.name).partition('_')[0]
+        subt = dictionary[f'{own_name}']
         export_path = Path(self.input_folder, 'keys' + f"_{subt}.csv")
         dic.to_csv(export_path, index=False, encoding='utf-8')

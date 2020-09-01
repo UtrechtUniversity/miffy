@@ -18,16 +18,17 @@ class AnonymizeInstagram:
     """ Detect and anonymize personal information in Instagram text files"""
 
     def __init__(self, output_folder: Path, input_folder: Path, zip_file: Union[Path, list],
-                 part: str, cap: bool = False, ptp: bool = False):
+                 cap: bool = False, ptp: bool = False):
         self.logger = logging.getLogger('anonymizing')
         self.zip_file = zip_file
         self.input_folder = input_folder
         self.output_folder = output_folder
         self.cap = cap
-        self.part = part
         self.ptp = ptp
 
         self.unpacked = self.unpack()
+        self.inspect_files()
+        self.anonymize()
 
     def unpack(self):
         """Extract data package to output folder """
