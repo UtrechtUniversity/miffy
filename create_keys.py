@@ -4,6 +4,7 @@ import re
 import pandas as pd
 import string
 import logging
+import hashlib
 
 class CreateKeys:
     """ Detect personal sensitive information in text; create keyfile for user and person names"""
@@ -18,45 +19,12 @@ class CreateKeys:
     def mingle(self, word):
         """ Creates scrambled version with letters and numbers of entered word """
 
-        word = list(word)
+        if len(str(word)) > 1:
+            pseudo = "__" + hashlib.md5(word.encode()).hexdigest()
+        else:
+            pseudo = ""
 
-        # Calculates corresponding number of each letter
-        number = []
-        for i in word:
-            if isinstance(i, int):
-                next
-            if i.isalpha():
-                number.append(ord(i))
-
-        numbers = []
-        for i in number:
-            numbers.append(i - 96)
-
-        # Creates new letters based on the position of each letter
-        letters = []
-        for i in range(len(number)):
-            letter = chr((number[i] + i))
-            if letter.isalpha():
-                letters.append(letter)
-            else:
-                letters.append(number[i])
-
-        # Creates scrambled version of letters and numbers
-        new = []
-        round = 0
-        for i in range(len(numbers)):
-            round = round + 1
-            if round == 1:
-                new.append('__')
-            elif round != len(numbers):
-                if isinstance(letters[i], int):
-                    next
-                elif letters[i].isalpha():
-                    new.append(letters[i])
-            else:
-                new.append(f'{numbers[i]}')
-
-        return ''.join(new)
+        return pseudo
 
     def read_participants(self) -> dict:
         """ Create dictionary with participant names and numbers """
@@ -95,7 +63,16 @@ class CreateKeys:
     def extr_usernames(self, df):
         """Extract all usernames in entered file """
 
-        username = []
+        try:
+            timestamp = r'_[0-9]{8}'
+            time = re.findall(timestamp, str(self.data_package.name))[0]
+        except IndexError:
+            timestamp = r'[0-9]{8}'
+            time = re.findall(timestamp, str(self.data_package.name))[0]
+
+        name_package = str(self.data_package.name).split(time)[0]
+
+        username = [name_package]
 
         try:
             df_users = df[list(df.columns[df.columns.str.contains(pat='user|follow|friends')])].dropna(how='all')
@@ -114,7 +91,8 @@ class CreateKeys:
 
         for col in df_search.columns:
             try:
-                username.extend(list(df_search[col]))
+                items = list(df_search[col].dropna(how='all')[0].keys())
+                username.extend([row[items[0]] for row in list(df_search[col].dropna(how='all'))])
             except:
                 next
 
@@ -139,7 +117,7 @@ class CreateKeys:
 
         for col in df_saved.columns:
             try:
-                username.extend([item[1] for item in list(df_saved[col])])
+                username.extend([item[1] for item in list(df_saved[col].dropna(how='all'))])
             except:
                 next
 
@@ -156,9 +134,17 @@ class CreateKeys:
                 next
 
         # Create dictionary with original username and mingled substitute
-        if self.ptp :
-            self.logger.info(f"Reading participants file")
+        if self.ptp:
             dictionary = self.read_participants()
+
+            if name_package in dictionary:
+                self.logger.info(f"{name_package} in participants file")
+                sub = f"{dictionary[name_package]}{time}"
+                dictionary.update({self.data_package.name: sub})
+            else:
+                self.logger.info(f"{name_package} not in participants file")
+                dictionary.update({self.data_package.name: self.mingle(name_package).split('__')[1]+time})
+
             for name in set(username):
                 try:
                     if name not in dictionary and name.lower() is not 'instagram':
@@ -167,7 +153,7 @@ class CreateKeys:
                     next
         else:
             self.logger.info(f"No participants file")
-            dictionary = {}
+            dictionary = {self.data_package.name: self.mingle(name_package).split('__')[1]+time}
             for name in set(username):
                 try:
                     if name.lower() is not 'instagram':
@@ -181,6 +167,7 @@ class CreateKeys:
         """Extract all names in entered file """
 
         names = []
+
         try:
             names.extend(list(df['name'].dropna(how='all')))
         except:
@@ -198,24 +185,15 @@ class CreateKeys:
         except:
             next
 
-        # Search for (the most) common names in saved usernames
+        # Add (the most) common names to 'names'
         path = Path(self.input_folder) / 'Firstnames_NL.lst'
-        file = pd.DataFrame(open(path).read().split('\n'))[0]
-
-        firstnames = []
-        for i in file:
-            if len(i) > 2:
-                firstnames.append(i)
-
-        for name in firstnames:
-            if name.lower() in json.dumps(df.to_dict(orient='list')).lower():
-                if name not in names or name.lower() not in names:
-                    names.append(name)
+        names.extend(open(path).read().split('\n'))
 
         # Create dictionary with original name and mingled substitute
         dictionary = {}
         for name in set(names):
-            dictionary.update({name: self.mingle(name)})
+            if len(name) > 1:
+                dictionary.update({name: self.mingle(name)})
 
         return dictionary
 
@@ -223,6 +201,7 @@ class CreateKeys:
         """Extract all email adresses in entered file """
 
         mails = []
+
         try:
             mails.extend(list(df['email'].dropna(how='all')))
         except:
@@ -251,6 +230,7 @@ class CreateKeys:
         """Extract all phone numbers in entered file """
 
         number = []
+
         try:
             df_phone = df[list(df.columns[df.columns.str.contains(pat='contact')])].dropna(how='all')
             for col in df_phone.columns:
@@ -294,39 +274,38 @@ class CreateKeys:
         return dictionary
 
     def replace_info(self):
-        """Replace sensitive info that Anonymize can't replace """
+        """Replace sensitive info in profile.json that Anonymize can't replace """
 
-        dic = {}
-        for json_file in self.data_package.glob('*.json'):
+        try:
+            json_file = Path(self.data_package, 'profile.json')
             with open(json_file, encoding="utf8") as f:
                 data = json.load(f)
-                if len(data) > 0:
-                    dic.update({f'{json_file}': data})
 
-        file = json.dumps(dic)
+            file = json.dumps(data)
 
-        # Replace bio and gender info
-        bio = re.findall(re.compile("biography\"\: \"(.*?)\""), file)
-        gender = re.findall(re.compile("gender\"\: \"(.*?)\""), file)
+            # Replace bio and gender info
+            bio = re.findall(re.compile("biography\"\: \"(.*?)\""), file)
+            gender = re.findall(re.compile("gender\"\: \"(.*?)\""), file)
 
-        if len(bio) >= 1:
-            file = file.replace(bio[0], '__bio')
-        if len(gender) >= 1:
-            file = file.replace(gender[0], '__gender')
+            if len(bio) >= 1:
+                file = file.replace(bio[0], '__bio')
+            if len(gender) >= 1:
+                file = file.replace(gender[0], '__gender')
 
-        # Save files
-        df = json.loads(file)
-        files = df.keys()
-        for file in files:
-            export_path = Path(file)
-            with open(export_path, 'w', encoding="utf8") as outfile:
-                json.dump(df[file], outfile)
+            # Save files
+            df = json.loads(file)
+            with open(json_file, 'w', encoding="utf8") as outfile:
+                json.dump(df, outfile)
+
+        except FileNotFoundError:
+            pass
 
     def create_keys(self):
         """Extract all sensitive information from files in given folder """
 
         json_files = self.data_package.glob('*.json')
         df = pd.DataFrame()
+
         for json_file in json_files:
             try:
                 my_df = pd.read_json(json_file)
@@ -350,11 +329,11 @@ class CreateKeys:
 
         self.replace_info()
 
+        sub = dictionary[self.data_package.name]
+
         dic = pd.DataFrame(list(dictionary.items()))
         dic = dic.rename(columns={0: 'id', 1: 'subt'})
 
         # remove timestamp to retrieve name of package owner
-        own_name = str(self.data_package.name).partition('_')[0]
-        subt = dictionary[f'{own_name}']
-        export_path = Path(self.input_folder, 'keys' + f"_{subt}.csv")
+        export_path = Path(self.input_folder, f"keys_{sub}.csv")
         dic.to_csv(export_path, index=False, encoding='utf-8')
