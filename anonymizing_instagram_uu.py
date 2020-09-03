@@ -10,6 +10,7 @@ import logging
 import itertools
 from create_keys import CreateKeys
 from typing import Union
+import hashlib
 from blur_images import BlurImages
 from blur_videos import BlurVideos
 
@@ -25,20 +26,17 @@ class AnonymizeInstagram:
         self.output_folder = output_folder
         self.cap = cap
         self.ptp = ptp
-
         self.unpacked = self.unpack()
-        self.inspect_files()
-        self.anonymize()
 
     def unpack(self):
         """Extract data package to output folder """
 
         try:
             # Check if variable is a path; statement also valid for other OS
-            if isinstance(self.zip_file,PurePath):
+            if isinstance(self.zip_file, PurePath):
                 unpacked = self.extract()
 
-            elif isinstance(self.zip_file,list):
+            elif isinstance(self.zip_file, list):
                 self.logger.info(f'Extracting zipfile {self.zip_file} in {self.output_folder}')
                 for index, zip_file in enumerate(self.zip_file):
                     if index == 0:
@@ -78,15 +76,14 @@ class AnonymizeInstagram:
     def inspect_files(self):
         """ Detect all sensitive information in files from given data package"""
 
-        print(f'Time for inspection')
         keys = CreateKeys(self.unpacked, self.input_folder, self.output_folder, self.ptp)
         keys.create_keys()
 
-        images = BlurImages(self.unpacked)
-        images.blur_images()
-
-        videos = BlurVideos(self.unpacked)
-        videos.blur_videos()
+        # images = BlurImages(self.unpacked)
+        # images.blur_images()
+        #
+        # videos = BlurVideos(self.unpacked)
+        # videos.blur_videos()
 
         self.anonymize()
 
@@ -106,18 +103,28 @@ class AnonymizeInstagram:
     def anonymize(self):
         """ Find sensitive info as described in key file and replace it with anonymized substitute """
 
-        self.logger.info("Anonymizing all files...")
-
-        own_name = str(self.unpacked.name).partition('_')[0]
+        self.logger.info(f"Pseudonymizing {self.unpacked.name}...")
 
         # Replacing sensitive info with substitute indicated in key file
-        if self.ptp:
-            part_dic = self.read_participants()
-            sub = part_dic[own_name]
-        else:
-            sub = own_name
+        try:
+            timestamp = r'_[0-9]{8}'
+            sep = re.findall(timestamp, str(self.unpacked.name))[0]
+        except IndexError:
+            timestamp = r'[0-9]{8}'
+            sep = re.findall(timestamp, str(self.unpacked.name))[0]
 
-        import_path = Path(self.input_folder, 'keys' + f"_{own_name}.csv")
+        name = str(self.unpacked.name).split(sep)[0]
+
+        if self.ptp:
+            participants = self.read_participants()
+            try:
+                sub = participants[name] + sep
+            except KeyError:
+                sub = hashlib.md5(name.encode()).hexdigest() + sep
+        else:
+            sub = hashlib.md5(name.encode()).hexdigest() + sep
+
+        import_path = Path(self.input_folder, f"keys_{sub}.csv")
 
         if self.cap:
             anonymize_csv = Anonymize(import_path, use_word_boundaries=True)
@@ -128,10 +135,6 @@ class AnonymizeInstagram:
 
         # Removing unnecessary files
         delete_path = Path(self.output_folder, sub)
-
-        # json_list = ['autofill.json', 'uploaded_contacts.json', 'contacts.json', 'account_history.json',
-        #              'devices.json',
-        #              'information_about_you.json', 'checkout.json']
 
         json_list = ['autofill.json', 'uploaded_contacts.json', 'account_history.json',
                      'devices.json', 'information_about_you.json']
@@ -184,7 +187,7 @@ def main():
                         default="log_anonym_insta.txt")
     parser.add_argument('--cap', default=False, action='store_true',
                         help="Replace capitalized names only (i.e., replacing 'Ben' but not 'ben')")
-    parser.add_argument('--ptp', default=False, action='store_true',
+    parser.add_argument('--ptp', '-p', default=False, action='store_true',
                         help="Use anonymization codes from participant list")
     args = parser.parse_args()
 
@@ -196,35 +199,60 @@ def main():
 
     zip_list = list(input_folder.glob('*.zip'))
 
+    widgets = [progressbar.Percentage(), progressbar.Bar()]
+    bar = progressbar.ProgressBar(widgets=widgets, max_value=len(zip_list)).start()
+
     # Check if there zip files are unique or part of a 'collection'
     usr = r'\S+'
     timestamp = r'_[0-9]{8}'
     patt = usr + timestamp
 
     ext_zip_list = []
-    for zip_file in zip_list:
-        # Regular pattern of zipfile for Insta DDP
-        res = re.match(patt + '.zip', str(zip_file.name))
+    norm_zip_list = []
+
+    for zip_file in enumerate(zip_list):
+        res = re.match(patt + '.zip', str(zip_file[1].name))
         if res:
-            instanonym = AnonymizeInstagram(output_folder, input_folder, zip_file, args.cap, args.ptp)
+            norm_zip_list.append(zip_file[1])
         else:
-            # Zipfiles in collection have a suffix, like usr_timestamp_part1.zip
-            ext_zip_list.append(zip_file)
+            ext_zip_list.append(zip_file[1])
 
     ext_zip_str = [str(i) for i in ext_zip_list]
     ext_zip_str.sort()
     grp_ext_zip = [list(g) for _, g in itertools.groupby(ext_zip_str, lambda x: x.partition('_')[0])]
 
-    for zip_grp in grp_ext_zip:
+    norm_zip_list.extend(grp_ext_zip)
+    for index, zip_grp in enumerate(norm_zip_list):
+
         # Account for unique zipfiles that do not meet regular pattern
-        if len(zip_grp) == 1:
-            instanonym = AnonymizeInstagram(output_folder, input_folder, Path(zip_grp[0]), args.cap, args.ptp)
-        elif len(zip_grp) > 1:
-            logger.info(f'Collection of files found with same user + timestamp: {zip_grp}')
+        try:
+            if len(zip_grp) == 1 and type(zip_grp) == list:
+                print(f"Started pseudonymizing the deviating package {zip_grp[0]}:")
+                instanonym = AnonymizeInstagram(output_folder, input_folder, Path(zip_grp[0]), args.cap, args.ptp)
+                instanonym.inspect_files()
+                logger.info(f"Finished pseudonymizing {zip_grp[0]}.")
+
+            elif len(zip_grp) > 1:
+                # logger.info(f'Collection of files found with same user + timestamp: {zip_grp}')
+                sep = re.findall(timestamp, str(zip_grp[0]))[0]
+                base = zip_grp[0].split(sep)[0]
+                print(f"Started pseudonymizing the split package {base + sep}:")
+                instanonym = AnonymizeInstagram(output_folder, input_folder, zip_grp, args.cap, args.ptp)
+                instanonym.inspect_files()
+                logger.info(f"Finished pseudonymizing {base + sep}.")
+
+        # Normal files:
+        except TypeError:
+            logger.info(f"Started pseudonymizing {zip_grp}:")
             instanonym = AnonymizeInstagram(output_folder, input_folder, zip_grp, args.cap, args.ptp)
+            instanonym.inspect_files()
+            logger.info(f"Finished pseudonymizing {zip_grp}.")
 
-    #instanonym.inspect_files()
+        print(" ")
+        time.sleep(1)
+        bar.update(index + 1)
 
+    bar.finish()
 
 if __name__ == '__main__':
     main()
