@@ -202,7 +202,7 @@ def main():
     widgets = [progressbar.Percentage(), progressbar.Bar()]
     bar = progressbar.ProgressBar(widgets=widgets, max_value=len(zip_list)).start()
 
-    # Check if there zip files are unique or part of a 'collection'
+    # Zip files that do not match regular filename pattern are unpacked differently
     usr = r'\S+'
     timestamp = r'_[0-9]{8}'
     patt = usr + timestamp
@@ -213,40 +213,49 @@ def main():
     for zip_file in enumerate(zip_list):
         res = re.match(patt + '.zip', str(zip_file[1].name))
         if res:
-            norm_zip_list.append(zip_file[1])
+            norm_zip_list.append(str(zip_file[1]))
         else:
-            ext_zip_list.append(zip_file[1])
+            ext_zip_list.append(str(zip_file[1]))
 
-    ext_zip_str = [str(i) for i in ext_zip_list]
-    ext_zip_str.sort()
-    grp_ext_zip = [list(g) for _, g in itertools.groupby(ext_zip_str, lambda x: x.partition('_')[0])]
+    # group zip files by username+timestap to distinguish 'collections'
+    ext_zip_list.sort()
+    grp_ext_zip = [list(g) for _, g in itertools.groupby(ext_zip_list, lambda x: x.partition('_')[0])]
 
     norm_zip_list.extend(grp_ext_zip)
     for index, zip_grp in enumerate(norm_zip_list):
+        print(f'Start anonymizing zip_grp {zip_grp}')
 
-        # Account for unique zipfiles that do not meet regular pattern
         try:
-            if len(zip_grp) == 1 and type(zip_grp) == list:
-                print(f"Started pseudonymizing the deviating package {zip_grp[0]}:")
-                instanonym = AnonymizeInstagram(output_folder, input_folder, Path(zip_grp[0]), args.cap, args.ptp)
-                instanonym.inspect_files()
-                logger.info(f"Finished pseudonymizing {zip_grp[0]}.")
+            if isinstance(zip_grp,list):
 
-            elif len(zip_grp) > 1:
-                # logger.info(f'Collection of files found with same user + timestamp: {zip_grp}')
-                sep = re.findall(timestamp, str(zip_grp[0]))[0]
-                base = zip_grp[0].split(sep)[0]
-                print(f"Started pseudonymizing the split package {base + sep}:")
-                instanonym = AnonymizeInstagram(output_folder, input_folder, zip_grp, args.cap, args.ptp)
-                instanonym.inspect_files()
-                logger.info(f"Finished pseudonymizing {base + sep}.")
+                # Account for unique zipfiles that do not meet regular pattern
+                if len(zip_grp) == 1:
+                    print(f"Started pseudonymizing the deviating package {zip_grp[0]}:")
+                    instanonym = AnonymizeInstagram(output_folder, input_folder, Path(zip_grp[0]), args.cap, args.ptp)
+                    instanonym.inspect_files()
+                    logger.info(f"Finished pseudonymizing {zip_grp[0]}.")
 
-        # Normal files:
-        except TypeError:
-            logger.info(f"Started pseudonymizing {zip_grp}:")
-            instanonym = AnonymizeInstagram(output_folder, input_folder, zip_grp, args.cap, args.ptp)
-            instanonym.inspect_files()
-            logger.info(f"Finished pseudonymizing {zip_grp}.")
+                # For collections
+                elif len(zip_grp) > 1:
+                    # logger.info(f'Collection of files found with same user + timestamp: {zip_grp}')
+                    print(f'Zip_grp[0] {zip_grp[0]} ')
+                    sep = re.findall(timestamp, str(zip_grp[0]))[0]
+                    base = zip_grp[0].split(sep)[0]
+                    print(f"Started pseudonymizing the split package {base + sep}:")
+                    instanonym = AnonymizeInstagram(output_folder, input_folder, zip_grp, args.cap, args.ptp)
+                    instanonym.inspect_files()
+                    logger.info(f"Finished pseudonymizing {base + sep}.")
+
+            # Regular files:
+            elif isinstance(zip_grp,str):
+                logger.info(f"Started pseudonymizing {zip_grp}:")
+                instanonym = AnonymizeInstagram(output_folder, input_folder, Path(zip_grp), args.cap, args.ptp)
+                instanonym.inspect_files()
+                logger.info(f"Finished pseudonymizing {zip_grp}.")
+
+        except TypeError as t:
+            self.logger.error(f"Exception {t} occurred  while processing {zip_grp}")
+            self.logger.warning("Skip and go to next zipfile")
 
         print(" ")
         time.sleep(1)
