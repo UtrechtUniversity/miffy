@@ -9,12 +9,14 @@ import hashlib
 class CreateKeys:
     """ Detect personal sensitive information in text; create keyfile for user and person names"""
 
-    def __init__(self, data_package: Path, input_folder: Path, output_folder: Path, ptp: bool = False):
+    # def __init__(self, data_package: Path, input_folder: Path, output_folder: Path, , ptp: bool = False):
+    def __init__(self, data_package: Path, input_folder: Path, output_folder: Path):
+
         self.logger = logging.getLogger('anonymizing.keys')
         self.data_package = data_package
         self.input_folder = input_folder
         self.output_folder = output_folder
-        self.ptp = ptp
+        # self.ptp = ptp
 
     def mingle(self, word):
         """ Creates scrambled version with letters and numbers of entered word """
@@ -26,7 +28,7 @@ class CreateKeys:
 
         return pseudo
 
-    def read_participants(self) -> dict:
+    def read_participants(self):
         """ Create dictionary with participant names and numbers """
 
         path = Path(self.input_folder) / 'participants.csv'
@@ -34,10 +36,12 @@ class CreateKeys:
         if len(participants.columns):
             participants = pd.read_csv(path, encoding="utf8", sep=';')
 
-        participants = participants.set_index(participants.columns[0])
-        dictionary = participants.to_dict()[participants.columns[0]]
+        # participants = participants.set_index(participants.columns[0])
+        # dictionary = participants.to_dict()[participants.columns[0]]
+        #
+        # return dictionary
 
-        return dictionary
+        return participants
 
     def extr_profile(self, df):
         """Extract all profile information from entered file """
@@ -91,8 +95,7 @@ class CreateKeys:
 
         for col in df_search.columns:
             try:
-                items = list(df_search[col].dropna(how='all')[0].keys())
-                username.extend([row[items[0]] for row in list(df_search[col].dropna(how='all'))])
+                username.extend([item for item in list(df_search[col].dropna(how = 'all'))])
             except:
                 next
 
@@ -117,7 +120,7 @@ class CreateKeys:
 
         for col in df_saved.columns:
             try:
-                username.extend([item[1] for item in list(df_saved[col].dropna(how='all'))])
+                username.extend([item[1] for item in list(df_saved[col].dropna(how = 'all'))])
             except:
                 next
 
@@ -134,33 +137,35 @@ class CreateKeys:
                 next
 
         # Create dictionary with original username and mingled substitute
-        if self.ptp:
-            dictionary = self.read_participants()
+        # if self.ptp:
+        #     self.logger.info(f"Reading participants file")
+        #     dictionary = self.read_participants()
+        #     for name in set(username):
+        #         try:
+        #             if name not in dictionary and name.lower() is not 'instagram':
+        #                 dictionary.update({name: self.mingle(name)})
+        #         except AttributeError:
+        #             next
+        # else:
+        #     self.logger.info(f"No participants file")
+        #     dictionary = {}
+        #     for name in set(username):
+        #         try:
+        #             if name.lower() is not 'instagram':
+        #                 dictionary.update({name: self.mingle(name)})
+        #         except AttributeError:
+        #             next
 
-            if name_package in dictionary:
-                self.logger.info(f"{name_package} in participants file")
-                sub = f"{dictionary[name_package]}{time}"
-                dictionary.update({self.data_package.name: sub})
-            else:
-                self.logger.info(f"{name_package} not in participants file")
-                dictionary.update({self.data_package.name: self.mingle(name_package).split('__')[1]+time})
+        participants = self.read_participants()
+        participants = participants.set_index(participants.columns[0])
+        dictionary = participants.to_dict()[participants.columns[0]]
 
-            for name in set(username):
-                try:
-                    if name not in dictionary and name.lower() is not 'instagram':
-                        dictionary.update({name: self.mingle(name)})
-                except AttributeError:
-                    next
-        else:
-            self.logger.info(f"No participants file")
-            dictionary = {self.data_package.name: self.mingle(name_package).split('__')[1]+time}
-            for name in set(username):
-                try:
-                    if name.lower() is not 'instagram':
-                        dictionary.update({name: self.mingle(name)})
-                except AttributeError:
-                    next
-
+        for name in set(username):
+            try:
+                if name not in dictionary and name.lower() is not 'instagram':
+                    dictionary.update({name: self.mingle(name)})
+            except AttributeError:
+                next
         return dictionary
 
     def extr_names(self, df):
@@ -277,6 +282,7 @@ class CreateKeys:
         """Replace sensitive info in profile.json that Anonymize can't replace """
 
         try:
+            # Read profile.json
             json_file = Path(self.data_package, 'profile.json')
             with open(json_file, encoding="utf8") as f:
                 data = json.load(f)
@@ -292,7 +298,7 @@ class CreateKeys:
             if len(gender) >= 1:
                 file = file.replace(gender[0], '__gender')
 
-            # Save files
+            # Save replaced profile.json file
             df = json.loads(file)
             with open(json_file, 'w', encoding="utf8") as outfile:
                 json.dump(df, outfile)
