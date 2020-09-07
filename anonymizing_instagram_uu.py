@@ -1,5 +1,5 @@
 import argparse
-from pathlib import Path,PurePath
+from pathlib import Path, PurePath
 import re
 from zipfile import ZipFile
 import pandas as pd
@@ -44,7 +44,7 @@ class AnonymizeInstagram:
                         unpacked = self.extract()
                     elif index > 0:
                         self.logger.info(f'Extracting files for {zip_file} in {self.output_folder}'
-                                         f'; replace existing files with name+suffix {index-1}')
+                                         f'; replace existing files with name+suffix {index - 1}')
                         with ZipFile(zip_file, 'r') as zipObj:
                             listOfFileNames = zipObj.namelist()
                             unpacked = Path(self.output_folder, self.zip_file.stem)
@@ -52,7 +52,7 @@ class AnonymizeInstagram:
                                 if fileName.endswith('.json'):
                                     if Path(unpacked, fileName).is_file():
                                         p = Path(unpacked, fileName)
-                                        p.replace(Path(unpacked, f"{p.stem}_{index-1}{p.suffix}"))
+                                        p.replace(Path(unpacked, f"{p.stem}_{index - 1}{p.suffix}"))
                                     zipObj.extract(fileName, unpacked)
             else:
                 self.logger.warning('Can not extract {self.zip_file}, do nothing')
@@ -69,7 +69,7 @@ class AnonymizeInstagram:
         self.logger.info(f'Extracting zipfile {self.zip_file}...')
         extracted = Path(self.output_folder, self.zip_file.stem)
         with ZipFile(self.zip_file, 'r') as zip:
-             zip.extractall(extracted)
+            zip.extractall(extracted)
 
         return extracted
 
@@ -223,45 +223,48 @@ def main():
 
     norm_zip_list.extend(grp_ext_zip)
     for index, zip_grp in enumerate(norm_zip_list):
-        print(f'Start anonymizing zip_grp {zip_grp}')
 
         try:
-            if isinstance(zip_grp,list):
+            logger.info(f"Started pseudonymizing {zip_grp}:")
+            if isinstance(zip_grp, list):
 
                 # Account for unique zipfiles that do not meet regular pattern
                 if len(zip_grp) == 1:
-                    print(f"Started pseudonymizing the deviating package {zip_grp[0]}:")
+                    logger.debug(f"Started pseudonymizing the deviating package {zip_grp[0]}:")
                     instanonym = AnonymizeInstagram(output_folder, input_folder, Path(zip_grp[0]), args.cap, args.ptp)
                     instanonym.inspect_files()
                     logger.info(f"Finished pseudonymizing {zip_grp[0]}.")
 
                 # For collections
                 elif len(zip_grp) > 1:
-                    # logger.info(f'Collection of files found with same user + timestamp: {zip_grp}')
-                    print(f'Zip_grp[0] {zip_grp[0]} ')
                     sep = re.findall(timestamp, str(zip_grp[0]))[0]
                     base = zip_grp[0].split(sep)[0]
-                    print(f"Started pseudonymizing the split package {base + sep}:")
+                    logger.debug(f"Started pseudonymizing the split package {base + sep}:")
                     instanonym = AnonymizeInstagram(output_folder, input_folder, zip_grp, args.cap, args.ptp)
                     instanonym.inspect_files()
                     logger.info(f"Finished pseudonymizing {base + sep}.")
 
             # Regular files:
-            elif isinstance(zip_grp,str):
-                logger.info(f"Started pseudonymizing {zip_grp}:")
+            elif isinstance(zip_grp, str):
                 instanonym = AnonymizeInstagram(output_folder, input_folder, Path(zip_grp), args.cap, args.ptp)
                 instanonym.inspect_files()
                 logger.info(f"Finished pseudonymizing {zip_grp}.")
 
         except TypeError as t:
-            self.logger.error(f"Exception {t} occurred  while processing {zip_grp}")
-            self.logger.warning("Skip and go to next zipfile")
+            logger.error(f"Exception {t} occurred  while processing {zip_grp}")
+            logger.warning("Skip and go to next zipfile")
+
+            print(" ")
+            time.sleep(1)
+            bar.update(index + 1)
+            continue
 
         print(" ")
         time.sleep(1)
         bar.update(index + 1)
 
     bar.finish()
+
 
 if __name__ == '__main__':
     main()
