@@ -28,9 +28,7 @@ class CreateKeys:
 
         return pseudo
 
-    # def read_participants(self) -> dict:
     def read_participants(self):
-
         """ Create dictionary with participant names and numbers """
 
         path = Path(self.input_folder) / 'participants.csv'
@@ -69,7 +67,16 @@ class CreateKeys:
     def extr_usernames(self, df):
         """Extract all usernames in entered file """
 
-        username = []
+        try:
+            timestamp = r'_[0-9]{8}'
+            time = re.findall(timestamp, str(self.data_package.name))[0]
+        except IndexError:
+            timestamp = r'[0-9]{8}'
+            time = re.findall(timestamp, str(self.data_package.name))[0]
+
+        name_package = str(self.data_package.name).split(time)[0]
+
+        username = [name_package]
 
         try:
             df_users = df[list(df.columns[df.columns.str.contains(pat='user|follow|friends')])].dropna(how='all')
@@ -159,13 +166,13 @@ class CreateKeys:
                     dictionary.update({name: self.mingle(name)})
             except AttributeError:
                 next
-
         return dictionary
 
     def extr_names(self, df):
         """Extract all names in entered file """
 
         names = []
+
         try:
             names.extend(list(df['name'].dropna(how='all')))
         except:
@@ -199,6 +206,7 @@ class CreateKeys:
         """Extract all email adresses in entered file """
 
         mails = []
+
         try:
             mails.extend(list(df['email'].dropna(how='all')))
         except:
@@ -227,6 +235,7 @@ class CreateKeys:
         """Extract all phone numbers in entered file """
 
         number = []
+
         try:
             df_phone = df[list(df.columns[df.columns.str.contains(pat='contact')])].dropna(how='all')
             for col in df_phone.columns:
@@ -302,6 +311,7 @@ class CreateKeys:
 
         json_files = self.data_package.glob('*.json')
         df = pd.DataFrame()
+
         for json_file in json_files:
             try:
                 my_df = pd.read_json(json_file)
@@ -325,9 +335,11 @@ class CreateKeys:
 
         self.replace_info()
 
+        sub = dictionary[self.data_package.name]
+
         dic = pd.DataFrame(list(dictionary.items()))
         dic = dic.rename(columns={0: 'id', 1: 'subt'})
 
-        subt = dictionary[f'{self.data_package.name}']
-        export_path = Path(self.input_folder, 'keys' + f"_{subt}.csv")
+        # remove timestamp to retrieve name of package owner
+        export_path = Path(self.input_folder, f"keys_{sub}.csv")
         dic.to_csv(export_path, index=False, encoding='utf-8')
