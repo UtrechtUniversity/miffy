@@ -1,5 +1,5 @@
 import argparse
-from pathlib import Path
+from pathlib import Path, PurePath
 import re
 from zipfile import ZipFile
 import pandas as pd
@@ -7,59 +7,76 @@ from anonymize import Anonymize
 import time
 import progressbar
 import logging
+import itertools
 from create_keys import CreateKeys
+from typing import Union
+import hashlib
 from blur_images import BlurImages
 from blur_videos import BlurVideos
+
 
 class AnonymizeInstagram:
     """ Detect and anonymize personal information in Instagram text files"""
 
-    def __init__(self, output_folder: Path, input_folder: Path, zip_file: Path, part: str, cap: bool = False):
+    def __init__(self, output_folder: Path, input_folder: Path, zip_file: Union[Path, list],
+                 cap: bool = False, ptp: bool = False):
         self.logger = logging.getLogger('anonymizing')
         self.zip_file = zip_file
         self.input_folder = input_folder
         self.output_folder = output_folder
         self.cap = cap
-        self.part = part
-
+        self.ptp = ptp
         self.unpacked = self.unpack()
 
     def unpack(self):
         """Extract data package to output folder """
 
         try:
-            for zip_file in self.zip_file:
-                self.logger.info(f'Unpacking zipfile {zip_file}...')
+            # Check if variable is a path; statement also valid for other OS
+            if isinstance(self.zip_file, PurePath):
+                unpacked = self.extract()
 
-                index = len(self.part)+9
-                pattern = zip_file.name[index:-4]
-                unpacked = Path(self.output_folder, self.part)
+            elif isinstance(self.zip_file, list):
+                self.logger.info(f'Extracting zipfile {self.zip_file} in {self.output_folder}')
+                for index, zip_file in enumerate(self.zip_file):
+                    if index == 0:
+                        self.zip_file = Path(zip_file)
+                        unpacked = self.extract()
+                    elif index > 0:
+                        self.logger.info(f'Extracting files for {zip_file} in {self.output_folder}'
+                                         f'; replace existing files with name+suffix {index - 1}')
+                        with ZipFile(zip_file, 'r') as zipObj:
+                            listOfFileNames = zipObj.namelist()
+                            unpacked = Path(self.output_folder, self.zip_file.stem)
+                            for fileName in listOfFileNames:
+                                if fileName.endswith('.json'):
+                                    if Path(unpacked, fileName).is_file():
+                                        p = Path(unpacked, fileName)
+                                        p.replace(Path(unpacked, f"{p.stem}_{index - 1}{p.suffix}"))
+                                    zipObj.extract(fileName, unpacked)
+            else:
+                self.logger.warning('Can not extract {self.zip_file}, do nothing')
+                unpacked = ' '
 
-                if int(pattern[-1]) == 1:
-                    with ZipFile(zip_file, 'r') as zip:
-                        zip.extractall(unpacked)
-
-                elif int(pattern[-1]) > 1:
-                    with ZipFile(zip_file, 'r') as zipObj:
-                        listOfFileNames = zipObj.namelist()
-                        for fileName in listOfFileNames:
-                            if fileName.endswith('.json'):
-                                if Path(unpacked, fileName).is_file():
-                                    p = Path(unpacked, fileName)
-                                    p.replace(Path(unpacked, f"{p.stem}{pattern[-1]}{p.suffix}"))
-                                zipObj.extract(fileName, unpacked)
-        except TypeError:
-            self.logger.info(f'Unpacking zipfile {self.zip_file}...')
-            unpacked = Path(self.output_folder, self.part)
-            with ZipFile(self.zip_file, 'r') as zip:
-                zip.extractall(unpacked)
+        except Exception as e:
+            self.logger.error(f"Exception {e} occurred  while processing {self.zip_file}")
+            self.logger.warning("Skip and go to next zip")
 
         return unpacked
+
+    def extract(self):
+        """Extract data package to output folder """
+        self.logger.info(f'Extracting zipfile {self.zip_file}...')
+        extracted = Path(self.output_folder, self.zip_file.stem)
+        with ZipFile(self.zip_file, 'r') as zip:
+            zip.extractall(extracted)
+
+        return extracted
 
     def inspect_files(self):
         """ Detect all sensitive information in files from given data package"""
 
-        keys = CreateKeys(self.unpacked, self.input_folder, self.output_folder)
+        keys = CreateKeys(self.unpacked, self.input_folder, self.output_folder, self.ptp)
         keys.create_keys()
 
         # images = BlurImages(self.unpacked)
@@ -70,34 +87,51 @@ class AnonymizeInstagram:
 
         self.anonymize()
 
-    def read_participants(self):
-        """ Open file with all participant numbers """
+    def read_participants(self) -> dict:
+        """ Create dictionary with participant names and numbers """
 
         path = Path(self.input_folder) / 'participants.csv'
         participants = pd.read_csv(path, encoding="utf8")
         if len(participants.columns):
             participants = pd.read_csv(path, encoding="utf8", sep=';')
 
-        return participants
+        participants = participants.set_index(participants.columns[0])
+        dictionary = participants.to_dict()[participants.columns[0]]
+
+        return dictionary
 
     def anonymize(self):
         """ Find sensitive info as described in key file and replace it with anonymized substitute """
 
-        participants = self.read_participants()
-        col = list(participants.columns)
-        file = self.unpacked
-
-        self.logger.info("Anonymizing all files...")
+        self.logger.info(f"Pseudonymizing {self.unpacked.name}...")
 
         # Replacing sensitive info with substitute indicated in key file
-        sub = list(participants[col[1]][participants[col[0]] == file.name])[0]
-        import_path = Path(self.input_folder, 'keys' + f"_{sub}.csv")
+        try:
+            timestamp = r'_[0-9]{8}'
+            sep = re.findall(timestamp, str(self.unpacked.name))[0]
+        except IndexError:
+            timestamp = r'[0-9]{8}'
+            sep = re.findall(timestamp, str(self.unpacked.name))[0]
+
+        name = str(self.unpacked.name).split(sep)[0]
+
+        if self.ptp:
+            participants = self.read_participants()
+            try:
+                sub = participants[name] + sep
+            except KeyError:
+                sub = hashlib.md5(name.encode()).hexdigest() + sep
+        else:
+            sub = hashlib.md5(name.encode()).hexdigest() + sep
+
+        import_path = Path(self.input_folder, f"keys_{sub}.csv")
+
         if self.cap:
             anonymize_csv = Anonymize(import_path, use_word_boundaries=True)
         else:
             anonymize_csv = Anonymize(import_path, use_word_boundaries=True, flags=re.IGNORECASE)
 
-        anonymize_csv.substitute(file)
+        anonymize_csv.substitute(self.unpacked)
 
         # Removing unnecessary files
         delete_path = Path(self.output_folder, sub)
@@ -112,7 +146,8 @@ class AnonymizeInstagram:
                 self.logger.error(f"Error {e} occurred while deleting {json_file} ")
                 continue
 
-def init_logging(log_file: Path) :
+
+def init_logging(log_file: Path):
     """
     Initialise Python logger
     :param log_file: Path to the log file.
@@ -150,8 +185,10 @@ def main():
                         default=".")
     parser.add_argument("--log_file", "-l", help="Enter path to log file",
                         default="log_anonym_insta.txt")
-    parser.add_argument('--cap', default=True, action='store_true',
+    parser.add_argument('--cap', default=False, action='store_true',
                         help="Replace capitalized names only (i.e., replacing 'Ben' but not 'ben')")
+    parser.add_argument('--ptp', '-p', default=False, action='store_true',
+                        help="Use anonymization codes from participant list")
     args = parser.parse_args()
 
     logger = init_logging(Path(args.log_file))
@@ -161,42 +198,66 @@ def main():
     output_folder.mkdir(parents=True, exist_ok=True)
 
     zip_list = list(input_folder.glob('*.zip'))
-    part_list = pd.read_csv(Path(input_folder, 'participants.csv'), encoding="utf8", sep = ';')
-    part_list = list(part_list[part_list.columns[0]])
 
     widgets = [progressbar.Percentage(), progressbar.Bar()]
-    bar = progressbar.ProgressBar(widgets=widgets, max_value=len(part_list)).start()
+    bar = progressbar.ProgressBar(widgets=widgets, max_value=len(zip_list)).start()
 
-    for index, parti in enumerate(part_list):
-        part = parti
-        logger.info(f"Started anonymizing {part}:")
+    # Zip files that do not match regular filename pattern are unpacked differently
+    usr = r'\S+'
+    timestamp = r'_[0-9]{8}'
+    patt = usr + timestamp
 
-        if str(zip_list).count(part) == 1:
-            zip_file = re.findall(f'({part}'+'_[0-9]{8}.zip)', str(zip_list))
-            zip_file = Path(input_folder, zip_file[0])
+    ext_zip_list = []
+    norm_zip_list = []
 
-            instanonym = AnonymizeInstagram(output_folder, input_folder, zip_file, part, args.cap)
-            instanonym.inspect_files()
-
-            logger.info(f"Finished anonymizing {part}.")
-
-        elif str(zip_list).count(part) > 1:
-            zip_file = []
-            for zip in zip_list:
-                try:
-                    files = re.findall(f'({part}.*.zip)', str(zip))[0]
-                    zip_file.append(Path(input_folder, files))
-                except:
-                    next
-
-            instanonym = AnonymizeInstagram(output_folder, input_folder, zip_file, part, args.cap)
-            instanonym.inspect_files()
-
-            logger.info(f"Finished anonymizing {part}.")
-
+    for zip_file in enumerate(zip_list):
+        res = re.match(patt + '.zip', str(zip_file[1].name))
+        if res:
+            norm_zip_list.append(str(zip_file[1]))
         else:
-            logger.info(f"No package found for {part}.")
-            next
+            ext_zip_list.append(str(zip_file[1]))
+
+    # group zip files by username+timestap to distinguish 'collections'
+    ext_zip_list.sort()
+    grp_ext_zip = [list(g) for _, g in itertools.groupby(ext_zip_list, lambda x: x.partition('_')[0])]
+
+    norm_zip_list.extend(grp_ext_zip)
+    for index, zip_grp in enumerate(norm_zip_list):
+
+        try:
+            logger.info(f"Started pseudonymizing {zip_grp}:")
+            if isinstance(zip_grp, list):
+
+                # Account for unique zipfiles that do not meet regular pattern
+                if len(zip_grp) == 1:
+                    logger.debug(f"Started pseudonymizing the deviating package {zip_grp[0]}:")
+                    instanonym = AnonymizeInstagram(output_folder, input_folder, Path(zip_grp[0]), args.cap, args.ptp)
+                    instanonym.inspect_files()
+                    logger.info(f"Finished pseudonymizing {zip_grp[0]}.")
+
+                # For collections
+                elif len(zip_grp) > 1:
+                    sep = re.findall(timestamp, str(zip_grp[0]))[0]
+                    base = zip_grp[0].split(sep)[0]
+                    logger.debug(f"Started pseudonymizing the split package {base + sep}:")
+                    instanonym = AnonymizeInstagram(output_folder, input_folder, zip_grp, args.cap, args.ptp)
+                    instanonym.inspect_files()
+                    logger.info(f"Finished pseudonymizing {base + sep}.")
+
+            # Regular files:
+            elif isinstance(zip_grp, str):
+                instanonym = AnonymizeInstagram(output_folder, input_folder, Path(zip_grp), args.cap, args.ptp)
+                instanonym.inspect_files()
+                logger.info(f"Finished pseudonymizing {zip_grp}.")
+
+        except TypeError as t:
+            logger.error(f"Exception {t} occurred  while processing {zip_grp}")
+            logger.warning("Skip and go to next zipfile")
+
+            print(" ")
+            time.sleep(1)
+            bar.update(index + 1)
+            continue
 
         print(" ")
         time.sleep(1)
