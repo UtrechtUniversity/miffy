@@ -20,6 +20,7 @@ class AnonymizeInstagram:
 
     def __init__(self, output_folder: Path, input_folder: Path, zip_file: Union[Path, list],
                  cap: bool = False, ptp: bool = False):
+
         self.logger = logging.getLogger('anonymizing')
         self.zip_file = zip_file
         self.input_folder = input_folder
@@ -45,9 +46,17 @@ class AnonymizeInstagram:
                     elif index > 0:
                         self.logger.info(f'Extracting files for {zip_file} in {self.output_folder}'
                                          f'; replace existing files with name+suffix {index - 1}')
+                        try:
+                            timestamp = r'_[0-9]{8}'
+                            sep = re.findall(timestamp, str(self.zip_file.stem))[0]
+                        except IndexError:
+                            timestamp = r'[0-9]{8}'
+                            sep = re.findall(timestamp, str(self.zip_file.stem))[0]
+                        name = str(self.zip_file.stem).split(sep)[0] + sep
+
                         with ZipFile(zip_file, 'r') as zipObj:
                             listOfFileNames = zipObj.namelist()
-                            unpacked = Path(self.output_folder, self.zip_file.stem)
+                            unpacked = Path(self.output_folder, name)
                             for fileName in listOfFileNames:
                                 if fileName.endswith('.json'):
                                     if Path(unpacked, fileName).is_file():
@@ -67,7 +76,16 @@ class AnonymizeInstagram:
     def extract(self):
         """Extract data package to output folder """
         self.logger.info(f'Extracting zipfile {self.zip_file}...')
-        extracted = Path(self.output_folder, self.zip_file.stem)
+
+        try:
+            timestamp = r'_[0-9]{8}'
+            sep = re.findall(timestamp, str(self.zip_file.stem))[0]
+        except IndexError:
+            timestamp = r'[0-9]{8}'
+            sep = re.findall(timestamp, str(self.zip_file.stem))[0]
+        name = str(self.zip_file.stem).split(sep)[0] + sep
+
+        extracted = Path(self.output_folder, name)
         with ZipFile(self.zip_file, 'r') as zip:
             zip.extractall(extracted)
 
