@@ -1,87 +1,113 @@
-def extract_values(obj, keys):
-    """Pull all values of specified key from nested JSON."""
+import collections
+import dateutil.parser
+from datetime import datetime
+import logging
+import re
 
-    usr = r'^\S{6,}$'
-    arr = []
 
-    def extract(obj, arr, keys):
+class ParseJson:
+    """ Extract usernames in jsonfiles"""
+
+    def __init__(self, data: dict):
+        self.logger = logging.getLogger('anonymizing.parse_json')
+        self.usr = r'^\S{6,}$'
+        self.data = data
+        self.labels = self.get_labels()
+
+    def json_extract_usrs(self) -> set:
+        """Extract user names from nested JSON."""
+
+        arr = []
+
+        # Extract values with recursive function
+        values = self.extract(self.data, arr)
+        flat_values = [i for i in self.flatten(values)]
+
+        try:
+            flat_values = set(flat_values)
+        except TypeError:
+            pass
+
+        return flat_values
+
+    def extract(self, obj, arr: list) -> list:
         """Recursively search for values of key in JSON tree."""
+
         if isinstance(obj, dict):
-            print('Found dict')
             for k, v in obj.items():
-                print(f'Key {k} and value {v}')
                 if v:
                     if isinstance(v, (dict, list)):
-                        print(f'Value {v} is list; redo extract')
-                        extract(v, arr, keys)
+                        self.extract(v, arr)
                     elif isinstance(v, str):
-                        if any(label.match(k) for label in regex_labels):
-                            print(f'Key {k} matches regex labels')
-                            print(f'Append value {v}')
-                            arr.append(v)
-                        elif re.match(usr, k) and check_datetime(v):
-                            print(f'Key {k} matches user and value {v} is datetime')
+                        if any(label.match(k) for label in self.labels):
+                            try:
+                               int(v)
+                               pass
+                            except ValueError:
+                                arr.append(v)
+                        elif re.match(self.usr, k) and self.check_datetime(v):
                             arr.append(k)
         elif isinstance(obj, list):
-            print('Found list')
             if obj:
                 try:
-                    names = get_username(obj)
-                    print(f'Names {names} found in list; append')
+                    names = self.get_username(obj)
                     arr.append(names)
                 except:
                     for item in obj:
-                        print(f'Redo extract for {item}')
-                        extract(item, arr, keys)
-            else:
-                print('Seems like {obj} is empty list')
-                pass
+                        self.extract(item, arr)
         return arr
 
-    results = extract(obj, arr, keys)
-    return set(results)
+    def get_labels(self) -> list:
+        """Get regular expressions of json search labels"""
+        labels = [r'search_click',
+                  r'participants',
+                  r'sender',
+                  r'^\S*name',
+                  r'^\S*friends$',
+                  r'^\S*user\S*$',
+                  r'^\S*owner$',
+                  r'^follow\S*$',
+                  r'^contact\S*$']
 
-def check_datetime(date_text):
-    """Check if given string can be converted to a datetime format"""
-    try:
-        res = dateutil.parser.parse(date_text)
-        return res
-    except ValueError:
-        pass
-    try:
-        res = datetime.utcfromtimestamp(int(date_text))
-        return res
-    except ValueError:
-        pass
+        regex_labels = [re.compile(l) for l in labels]
 
+        return regex_labels
 
-def get_username(my_list):
-    """Check if given list contains username"""
+    def check_datetime(self,date_text: str) -> datetime:
+        """Check if given string can be converted to a datetime format"""
+        try:
+            res = dateutil.parser.parse(date_text)
+            return res
+        except ValueError:
+            pass
+        try:
+            res = datetime.utcfromtimestamp(int(date_text))
+            return res
+        except ValueError:
+            pass
 
-    matches = [x for x in my_list if check_datetime(x)]
-    usr = r'^\S{6,}$'
+    def get_username(self,obj: list):
+        """Check if given list contains username"""
 
-    usr_list = []
+        matches = [x for x in obj if self.check_datetime(x)]
 
-    if matches:
-        for i in my_list:
-            if i not in matches:
-                try:
-                    res = re.match(usr, i)
-                    usr_list.append(res.group(0))
-                except:
-                    pass
-    else:
-        pass
+        usr_list = []
 
-    return usr_list
+        if matches:
+            for i in obj:
+                if i not in matches:
+                    try:
+                        res = re.match(self.usr, i)
+                        usr_list.append(res.group(0))
+                    except:
+                        pass
 
-labels = [r'search_click',
-              r'participants',
-              r'sender',
-              r'^\S+name',
-              r'^\S+friends$',
-              r'^\S+users$',
-              r'^follow\S+$']
+        return usr_list
 
-regex_labels = [re.compile(l) for l in labels]
+    def flatten(self,obj: list) -> list:
+        """Flatten irregular list of lists"""
+        for el in obj:
+            if isinstance(el, collections.abc.Iterable) and not isinstance(el, (str, bytes)):
+                yield from self.flatten(el)
+            else:
+                yield el
