@@ -1,7 +1,11 @@
+import argparse
 import collections
+import csv
 import dateutil.parser
 from datetime import datetime
+import json
 import logging
+from pathlib import Path
 import re
 
 
@@ -21,12 +25,7 @@ class ParseJson:
 
         # Extract values with recursive function
         values = self.extract(self.data, arr)
-        flat_values = [i for i in self.flatten(values)]
-
-        try:
-            flat_values = set(flat_values)
-        except TypeError:
-            pass
+        flat_values = ParseJson.format_list(values)
 
         return flat_values
 
@@ -40,11 +39,12 @@ class ParseJson:
                         self.extract(v, arr)
                     elif isinstance(v, str):
                         if any(label.match(k) for label in self.labels):
-                            try:
-                               int(v)
-                               pass
-                            except ValueError:
-                                arr.append(v)
+                            if re.match(self.usr, v):
+                                try:
+                                   int(v)
+                                   pass
+                                except ValueError:
+                                    arr.append(v)
                         elif re.match(self.usr, k) and self.check_datetime(v):
                             arr.append(k)
         elif isinstance(obj, list):
@@ -62,6 +62,8 @@ class ParseJson:
         labels = [r'search_click',
                   r'participants',
                   r'sender',
+                  r'author'
+                  r'^\S*mail',
                   r'^\S*name',
                   r'^\S*friends$',
                   r'^\S*user\S*$',
@@ -104,10 +106,54 @@ class ParseJson:
 
         return usr_list
 
-    def flatten(self,obj: list) -> list:
+    @staticmethod
+    def format_list(obj: list) -> set:
+        """Flatten list and remove duplicates"""
+
+        flat_usr = [i for i in ParseJson.flatten(obj)]
+        try:
+            flat_usr = set(flat_usr)
+        except TypeError:
+            pass
+        return flat_usr
+
+    @staticmethod
+    def flatten(obj: list) -> list:
         """Flatten irregular list of lists"""
         for el in obj:
             if isinstance(el, collections.abc.Iterable) and not isinstance(el, (str, bytes)):
-                yield from self.flatten(el)
+                yield from ParseJson.flatten(el)
             else:
                 yield el
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Extract usernames from nested json files.')
+    parser.add_argument("--input_folder", "-i", help="Enter path to folder containing json files",
+                        default=".")
+    parser.add_argument("--output_folder", "-o", help="Enter path to folder where results will be saved",
+                        default=".")
+    args = parser.parse_args()
+
+    input_folder = Path(args.input_folder)
+    output_folder = Path(args.output_folder)
+    output_folder.mkdir(parents=True, exist_ok=True)
+
+    usr_list = []
+    for file in input_folder.glob('*.json'):
+        with open(file, encoding="utf8") as f:
+            print(f'Extracting file {file}')
+            data = json.load(f)
+            parser = ParseJson(data)
+            res = parser.json_extract_usrs()
+            usr_list.append(res)
+
+    flat_usr = ParseJson.format_list(usr_list)
+
+    with open('myfile.csv', 'w', newline='\n') as csvfile:
+        csvwriter = csv.writer(csvfile,delimiter="\n")
+        csvwriter.writerow(['Username'])
+        csvwriter.writerow(flat_usr)
+
+if __name__ == '__main__':
+    main()
