@@ -1,8 +1,8 @@
 import argparse
 import collections
-import csv
 import dateutil.parser
 from datetime import datetime
+import hashlib
 import json
 import logging
 import pandas as pd
@@ -13,21 +13,28 @@ import re
 class ParseJson:
     """ Extract usernames in jsonfiles"""
 
-    def __init__(self, data: dict):
+    def __init__(self, data: dict,input_folder: Path,output_folder: Path):
         self.logger = logging.getLogger('anonymizing.parse_json')
         self.email = r'[\w\.-]+@[\w\.-]+'
         self.data = data
+        self.input_folder = input_folder
+        self.output_folder = output_folder
         self.labels = self.get_labels()
 
-    def json_extract_usrs(self) -> set:
+    def create_keys(self) -> dict:
         """Extract user names from nested JSON."""
 
         key_dict = {}
 
         # Extract values with recursive function
         keys = self.extract(self.data, key_dict)
+        common_names = self.common_names()
+        keys.update(common_names)
 
-        return keys
+        # Replace name label with hash code
+        hash_key_dict = {k:(self.mingle(v) if v == '__name' else v) for k, v in key_dict.items()}
+
+        return hash_key_dict
 
     def extract(self, obj, key_dict: dict) -> dict:
         """Recursively search for values of key in JSON tree."""
@@ -132,6 +139,32 @@ class ParseJson:
 
         return usr_list
 
+    def common_names(self)-> dict:
+        """Add common given names in NL to keys dictionary"""
+
+        name_file = Path.cwd() / 'Firstnames_NL.lst'
+        with name_file.open() as f:
+            names = [i.strip() for i in f.readlines()]
+
+        # Create dictionary with original name and mingled substitute
+        name_dict = {}
+        for name in set(names):
+            if len(name) > 1:
+                name_dict[name] = '__name'
+
+        return name_dict
+
+    @staticmethod
+    def mingle(text:str)-> str:
+        """ Creates scrambled version with letters and numbers of entered word """
+
+        if len(str(text)) > 1:
+            pseudo = "__" + hashlib.md5(text.encode()).hexdigest()
+        else:
+            pseudo = ""
+
+        return pseudo
+
     @staticmethod
     def format_dict(obj:list)-> dict:
         """Format irregular list of dictionaries and remove duplicates"""
@@ -177,11 +210,11 @@ def main():
 
     keys = []
     for file in input_folder.glob('*.json'):
-        with open(file, encoding="utf8") as f:
+        with file.open(encoding="utf8") as f:
             print(f'Extracting file {file}')
             data = json.load(f)
-            parser = ParseJson(data)
-            res = parser.json_extract_usrs()
+            parser = ParseJson(data,input_folder,output_folder)
+            res = parser.create_keys()
             keys.append(res)
 
     all_keys = ParseJson.format_dict(keys)
