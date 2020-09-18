@@ -8,7 +8,7 @@ import time
 import progressbar
 import logging
 import itertools
-from create_keys import CreateKeys
+from parse_json import ParseJson
 from typing import Union
 import hashlib
 from blur_images import BlurImages
@@ -18,15 +18,15 @@ from blur_videos import BlurVideos
 class AnonymizeInstagram:
     """ Detect and anonymize personal information in Instagram text files"""
 
-    def __init__(self, output_folder: Path, input_folder: Path, zip_file: Union[Path, list],
-                 cap: bool = False, ptp: bool = False):
+    def __init__(self, output_folder: Path, zip_file: Union[Path, list],
+                 ptp: Path = None, cap: bool = False, ):
 
         self.logger = logging.getLogger('anonymizing')
         self.zip_file = zip_file
-        self.input_folder = input_folder
         self.output_folder = output_folder
-        self.cap = cap
         self.ptp = ptp
+        self.cap = cap
+
         self.unpacked = self.unpack()
 
     def unpack(self):
@@ -91,11 +91,34 @@ class AnonymizeInstagram:
 
         return extracted
 
+    def get_key_file(self) -> Path:
+        """ Write sensitive information and coded labels to csv file"""
+
+        parser = ParseJson(self.unpacked, self.output_folder)
+
+        if self.ptp:
+            # merge two dictionaries; values from part_dict overwrite values from key_dict
+            temp_key_dict = parser.create_keys()
+            part_dict = self.read_participants()
+            key_dict = {**temp_key_dict, **part_dict}
+        else:
+            key_dict = parser.create_keys()
+
+        # hash name of package owner in name output file
+        name, timestamp = self.get_name_time()
+        sub = key_dict[name]
+        outfile = self.output_folder / f'keys_{sub}_{timestamp}.csv'
+
+        # write keys to csv file as input for anonymizeUU package
+        key_series = pd.Series(key_dict, name='subt')
+        key_series.to_csv(outfile, index_label='id', header=True)
+
+        return outfile
+
     def inspect_files(self):
         """ Detect all sensitive information in files from given data package"""
 
-        keys = CreateKeys(self.unpacked, self.input_folder, self.output_folder, self.ptp)
-        keys.create_keys()
+        self.get_key_file()
 
         # images = BlurImages(self.unpacked)
         # images.blur_images()
@@ -108,7 +131,8 @@ class AnonymizeInstagram:
     def read_participants(self) -> dict:
         """ Create dictionary with participant names and numbers """
 
-        path = Path(self.input_folder) / 'participants.csv'
+        # TODO: replace bool arg in main with path to ptp file
+        path = Path.cwd() / 'participants.csv'
         participants = pd.read_csv(path, encoding="utf8")
         if len(participants.columns):
             participants = pd.read_csv(path, encoding="utf8", sep=';')
@@ -118,51 +142,40 @@ class AnonymizeInstagram:
 
         return dictionary
 
+    def get_name_time(self):
+        """Retrieve owners name and timestamp from data package filename"""
+
+        patt = r'_?[0-9]{8}'
+        timestamp = re.findall(patt, str(self.unpacked.name))[0]
+
+        name = str(self.unpacked.name).split(timestamp)[0]
+
+        return name,timestamp
+
     def anonymize(self):
         """ Find sensitive info as described in key file and replace it with anonymized substitute """
 
         self.logger.info(f"Pseudonymizing {self.unpacked.name}...")
 
-        # Replacing sensitive info with substitute indicated in key file
-        try:
-            timestamp = r'_[0-9]{8}'
-            sep = re.findall(timestamp, str(self.unpacked.name))[0]
-        except IndexError:
-            timestamp = r'[0-9]{8}'
-            sep = re.findall(timestamp, str(self.unpacked.name))[0]
-
-        name = str(self.unpacked.name).split(sep)[0]
-
-        if self.ptp:
-            participants = self.read_participants()
-            try:
-                sub = participants[name] + sep
-            except KeyError:
-                sub = hashlib.md5(name.encode()).hexdigest() + sep
-        else:
-            sub = hashlib.md5(name.encode()).hexdigest() + sep
-
-        import_path = Path(self.input_folder, f"keys_{sub}.csv")
-
-        if self.cap:
-            anonymize_csv = Anonymize(import_path, use_word_boundaries=True)
-        else:
-            anonymize_csv = Anonymize(import_path, use_word_boundaries=True, flags=re.IGNORECASE)
-
-        anonymize_csv.substitute(self.unpacked)
-
         # Removing unnecessary files
-        delete_path = Path(self.output_folder, sub)
-
         json_list = ['autofill.json', 'uploaded_contacts.json', 'account_history.json',
                      'devices.json', 'information_about_you.json']
         for json_file in json_list:
             try:
-                file_to_rem = Path(delete_path, json_file)
+                file_to_rem = Path(self.unpacked, json_file)
                 file_to_rem.unlink()
             except FileNotFoundError as e:
                 self.logger.error(f"Error {e} occurred while deleting {json_file} ")
                 continue
+
+        key_file = self.get_key_file()
+
+        if self.cap:
+            anonymize_csv = Anonymize(key_file, use_word_boundaries=True)
+        else:
+            anonymize_csv = Anonymize(key_file, use_word_boundaries=True, flags=re.IGNORECASE)
+
+        anonymize_csv.substitute(self.unpacked)
 
 
 def init_logging(log_file: Path):
@@ -203,10 +216,11 @@ def main():
                         default=".")
     parser.add_argument("--log_file", "-l", help="Enter path to log file",
                         default="log_anonym_insta.txt")
+    parser.add_argument('--ptp', '-p', default=None,
+                        help="Enter path to participants list to use corresponding anonymization codes")
     parser.add_argument('--cap', default=False, action='store_true',
                         help="Replace capitalized names only (i.e., replacing 'Ben' but not 'ben')")
-    parser.add_argument('--ptp', '-p', default=False, action='store_true',
-                        help="Use anonymization codes from participant list")
+
     args = parser.parse_args()
 
     logger = init_logging(Path(args.log_file))
@@ -249,7 +263,7 @@ def main():
                 # Account for unique zipfiles that do not meet regular pattern
                 if len(zip_grp) == 1:
                     logger.debug(f"Started pseudonymizing the deviating package {zip_grp[0]}:")
-                    instanonym = AnonymizeInstagram(output_folder, input_folder, Path(zip_grp[0]), args.cap, args.ptp)
+                    instanonym = AnonymizeInstagram(output_folder, Path(zip_grp[0]), args.cap, args.ptp)
                     instanonym.inspect_files()
                     logger.info(f"Finished pseudonymizing {zip_grp[0]}.")
 
@@ -258,13 +272,13 @@ def main():
                     sep = re.findall(timestamp, str(zip_grp[0]))[0]
                     base = zip_grp[0].split(sep)[0]
                     logger.debug(f"Started pseudonymizing the split package {base + sep}:")
-                    instanonym = AnonymizeInstagram(output_folder, input_folder, zip_grp, args.cap, args.ptp)
+                    instanonym = AnonymizeInstagram(output_folder, zip_grp, args.cap, args.ptp)
                     instanonym.inspect_files()
                     logger.info(f"Finished pseudonymizing {base + sep}.")
 
             # Regular files:
             elif isinstance(zip_grp, str):
-                instanonym = AnonymizeInstagram(output_folder, input_folder, Path(zip_grp), args.cap, args.ptp)
+                instanonym = AnonymizeInstagram(output_folder, Path(zip_grp), args.cap, args.ptp)
                 instanonym.inspect_files()
                 logger.info(f"Finished pseudonymizing {zip_grp}.")
 
