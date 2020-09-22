@@ -10,13 +10,14 @@ import logging
 import itertools
 from parse_json import ParseJson
 from typing import Union
+import json
 import hashlib
 from blur_images import BlurImages
 from blur_videos import BlurVideos
 
 
 class AnonymizeInstagram:
-    """ Detect and anonymize personal information in Instagram text files"""
+    """ Detect and anonymize personal information in Instagram data packages"""
 
     def __init__(self, output_folder: Path, zip_file: Union[Path, list],
                  ptp: Path = None, cap: bool = False, ):
@@ -91,8 +92,35 @@ class AnonymizeInstagram:
 
         return extracted
 
+    def replace_profile(self):
+        """Replace sensitive info in profile.json that Anonymize can't replace """
+
+        try:
+            json_file = self.unpacked / 'profile.json'
+            with json_file.open(encoding="utf8") as f:
+                data = json.load(f)
+
+            file = json.dumps(data)
+
+            # Replace bio and gender info
+            bio = re.findall(re.compile("biography\": \"(.*?)\""), file)
+            gender = re.findall(re.compile("gender\": \"(.*?)\""), file)
+
+            if len(bio) >= 1:
+                file = file.replace(bio[0], '__bio')
+            if len(gender) >= 1:
+                file = file.replace(gender[0], '__gender')
+
+            # Save files
+            df = json.loads(file)
+            with json_file.open('w', encoding="utf8") as outfile:
+                json.dump(df, outfile)
+
+        except FileNotFoundError:
+            pass
+
     def get_key_file(self) -> Path:
-        """ Write sensitive information and coded labels to csv file"""
+        """ Write sensitive information and coded labels from json files to csv file"""
 
         parser = ParseJson(self.unpacked, self.output_folder)
 
@@ -116,18 +144,27 @@ class AnonymizeInstagram:
 
         return outfile
 
-    def inspect_files(self):
-        """ Detect all sensitive information in files from given data package"""
+    def preprocess_json(self):
+        """ Preprocess all json files in data package"""
 
+        # Replace info in profile.json
+        self.replace_profile()
+
+        # Remove unnecessary files
+        json_list = ['autofill.json', 'uploaded_contacts.json', 'account_history.json',
+                     'devices.json', 'information_about_you.json']
+        for json_file in json_list:
+            try:
+                file_to_rem = Path(self.unpacked, json_file)
+                file_to_rem.unlink()
+            except FileNotFoundError as e:
+                self.logger.warning(f"Error {e} occurred while deleting {json_file} ")
+                continue
+
+        # Extract sensitive info and create key file for remaining json files
         key_file = self.get_key_file()
 
-        # images = BlurImages(self.unpacked)
-        # images.blur_images()
-        #
-        # videos = BlurVideos(self.unpacked)
-        # videos.blur_videos()
-
-        self.anonymize(key_file)
+        return key_file
 
     def read_participants(self) -> dict:
         """ Create dictionary with participant names and numbers """
@@ -151,21 +188,19 @@ class AnonymizeInstagram:
 
         return name,timestamp
 
-    def anonymize(self, key_file):
+    def anonymize(self):
         """ Find sensitive info as described in key file and replace it with anonymized substitute """
+
+        self.logger.info(f"Preprocess {self.unpacked.name}...")
+        key_file = self.preprocess_json()
 
         self.logger.info(f"Pseudonymizing {self.unpacked.name}...")
 
-        # Removing unnecessary files
-        json_list = ['autofill.json', 'uploaded_contacts.json', 'account_history.json',
-                     'devices.json', 'information_about_you.json']
-        for json_file in json_list:
-            try:
-                file_to_rem = Path(self.unpacked, json_file)
-                file_to_rem.unlink()
-            except FileNotFoundError as e:
-                self.logger.warning(f"Error {e} occurred while deleting {json_file} ")
-                continue
+        # images = BlurImages(self.unpacked)
+        # images.blur_images()
+        #
+        # videos = BlurVideos(self.unpacked)
+        # videos.blur_videos()
 
         if self.cap:
             anonymize_csv = Anonymize(key_file, use_word_boundaries=True)
@@ -261,7 +296,7 @@ def main():
                 if len(zip_grp) == 1:
                     logger.debug(f"Started pseudonymizing the deviating package {zip_grp[0]}:")
                     instanonym = AnonymizeInstagram(output_folder, Path(zip_grp[0]), args.cap, args.ptp)
-                    instanonym.inspect_files()
+                    instanonym.anonymize()
                     logger.info(f"Finished pseudonymizing {zip_grp[0]}.")
 
                 # For collections
@@ -270,7 +305,7 @@ def main():
                     base = zip_grp[0].split(sep)[0]
                     logger.debug(f"Started pseudonymizing the split package {base + sep}:")
                     instanonym = AnonymizeInstagram(output_folder, zip_grp, args.ptp, args.capp)
-                    instanonym.inspect_files()
+                    instanonym.anonymize()
                     logger.info(f"Finished pseudonymizing {base + sep}.")
 
             # Regular files:
