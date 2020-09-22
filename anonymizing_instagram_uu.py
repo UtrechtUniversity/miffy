@@ -97,6 +97,7 @@ class AnonymizeInstagram:
         parser = ParseJson(self.unpacked, self.output_folder)
 
         if self.ptp:
+            self.logger.info(f'Add keys from participants file {self.ptp}')
             # merge two dictionaries; values from part_dict overwrite values from key_dict
             temp_key_dict = parser.create_keys()
             part_dict = self.read_participants()
@@ -118,7 +119,7 @@ class AnonymizeInstagram:
     def inspect_files(self):
         """ Detect all sensitive information in files from given data package"""
 
-        self.get_key_file()
+        key_file = self.get_key_file()
 
         # images = BlurImages(self.unpacked)
         # images.blur_images()
@@ -126,16 +127,14 @@ class AnonymizeInstagram:
         # videos = BlurVideos(self.unpacked)
         # videos.blur_videos()
 
-        self.anonymize()
+        self.anonymize(key_file)
 
     def read_participants(self) -> dict:
         """ Create dictionary with participant names and numbers """
 
-        # TODO: replace bool arg in main with path to ptp file
-        path = Path.cwd() / 'participants.csv'
-        participants = pd.read_csv(path, encoding="utf8")
+        participants = pd.read_csv(self.ptp, encoding="utf8")
         if len(participants.columns):
-            participants = pd.read_csv(path, encoding="utf8", sep=';')
+            participants = pd.read_csv(self.ptp, encoding="utf8", sep=';')
 
         participants = participants.set_index(participants.columns[0])
         dictionary = participants.to_dict()[participants.columns[0]]
@@ -152,7 +151,7 @@ class AnonymizeInstagram:
 
         return name,timestamp
 
-    def anonymize(self):
+    def anonymize(self, key_file):
         """ Find sensitive info as described in key file and replace it with anonymized substitute """
 
         self.logger.info(f"Pseudonymizing {self.unpacked.name}...")
@@ -165,10 +164,8 @@ class AnonymizeInstagram:
                 file_to_rem = Path(self.unpacked, json_file)
                 file_to_rem.unlink()
             except FileNotFoundError as e:
-                self.logger.error(f"Error {e} occurred while deleting {json_file} ")
+                self.logger.warning(f"Error {e} occurred while deleting {json_file} ")
                 continue
-
-        key_file = self.get_key_file()
 
         if self.cap:
             anonymize_csv = Anonymize(key_file, use_word_boundaries=True)
@@ -272,13 +269,13 @@ def main():
                     sep = re.findall(timestamp, str(zip_grp[0]))[0]
                     base = zip_grp[0].split(sep)[0]
                     logger.debug(f"Started pseudonymizing the split package {base + sep}:")
-                    instanonym = AnonymizeInstagram(output_folder, zip_grp, args.cap, args.ptp)
+                    instanonym = AnonymizeInstagram(output_folder, zip_grp, args.ptp, args.capp)
                     instanonym.inspect_files()
                     logger.info(f"Finished pseudonymizing {base + sep}.")
 
             # Regular files:
             elif isinstance(zip_grp, str):
-                instanonym = AnonymizeInstagram(output_folder, Path(zip_grp), args.cap, args.ptp)
+                instanonym = AnonymizeInstagram(output_folder, Path(zip_grp), args.ptp, args.cap)
                 instanonym.inspect_files()
                 logger.info(f"Finished pseudonymizing {zip_grp}.")
 
