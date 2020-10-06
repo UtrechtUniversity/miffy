@@ -158,7 +158,7 @@ class AnonymizeInstagram:
                 file_to_rem = Path(self.unpacked, json_file)
                 file_to_rem.unlink()
             except FileNotFoundError as e:
-                self.logger.warning(f"Error {e} occurred while deleting {json_file} ")
+                self.logger.warning(f"Could not delete {json_file}, no such file")
                 continue
 
         # Extract sensitive info and create key file for remaining json files
@@ -195,6 +195,8 @@ class AnonymizeInstagram:
         key_file = self.preprocess_json()
 
         self.logger.info(f"Pseudonymizing {self.unpacked.name}...")
+
+        # TODO: add pat_url = r'https?:.*instagram.com.*' to replace urls:directly call in Anonymize method?
 
         # images = BlurImages(self.unpacked)
         # images.blur_images()
@@ -289,13 +291,13 @@ def main():
     for index, zip_grp in enumerate(norm_zip_list):
 
         try:
-            logger.info(f"Started pseudonymizing {zip_grp}:")
+            logger.info(f"Started pseudonymization process for {zip_grp}:")
             if isinstance(zip_grp, list):
 
                 # Account for unique zipfiles that do not meet regular pattern
                 if len(zip_grp) == 1:
                     logger.debug(f"Started pseudonymizing the deviating package {zip_grp[0]}:")
-                    instanonym = AnonymizeInstagram(output_folder, Path(zip_grp[0]), args.cap, args.ptp)
+                    instanonym = AnonymizeInstagram(output_folder, Path(zip_grp[0]), args.ptp, args.cap)
                     instanonym.anonymize()
                     logger.info(f"Finished pseudonymizing {zip_grp[0]}.")
 
@@ -304,14 +306,14 @@ def main():
                     sep = re.findall(timestamp, str(zip_grp[0]))[0]
                     base = zip_grp[0].split(sep)[0]
                     logger.debug(f"Started pseudonymizing the split package {base + sep}:")
-                    instanonym = AnonymizeInstagram(output_folder, zip_grp, args.ptp, args.capp)
+                    instanonym = AnonymizeInstagram(output_folder, zip_grp, args.ptp, args.cap)
                     instanonym.anonymize()
                     logger.info(f"Finished pseudonymizing {base + sep}.")
 
             # Regular files:
             elif isinstance(zip_grp, str):
                 instanonym = AnonymizeInstagram(output_folder, Path(zip_grp), args.ptp, args.cap)
-                instanonym.inspect_files()
+                instanonym.anonymize()
                 logger.info(f"Finished pseudonymizing {zip_grp}.")
 
         except TypeError as t:
