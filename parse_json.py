@@ -11,7 +11,7 @@ import re
 
 
 class ParseJson:
-    """ Extract usernames in jsonfiles"""
+    """ Extract sensitive information in jsonfiles"""
 
     def __init__(self, input_folder: Path, output_folder: Path):
         self.logger = logging.getLogger('anonymizing.parse_json')
@@ -20,8 +20,8 @@ class ParseJson:
         self.output_folder = output_folder
         self.labels = self.get_labels()
 
-    def create_keys(self):
-        """Extract user names from nested JSON."""
+    def create_keys(self) -> dict:
+        """Extract sensitive information from nested JSON and store with coded labels in dictionary ."""
 
         # Create key file
         self.logger.info(f"Creating key file for {self.input_folder}...")
@@ -43,17 +43,7 @@ class ParseJson:
         all_keys = ParseJson.format_dict(keys)
         hash_key_dict = {k: (self.mingle(v) if v == '__name' else v) for k, v in all_keys.items()}
 
-        # Replace info in profile.json
-        self.replace_profile()
-
-        # hash name of package owner in name output file
-        owner = str(self.input_folder.name).split('_')[0]
-        sub = hash_key_dict[owner]
-        outfile = self.output_folder / f'keys_{sub}.csv'
-
-        # write keys to csv file as input for anonymizeUU package
-        key_series = pd.Series(hash_key_dict, name='subt')
-        key_series.to_csv(outfile, index_label='id', header=True)
+        return hash_key_dict
 
     def extract(self, obj, key_dict: dict) -> dict:
         """Recursively search for values of key in JSON tree."""
@@ -173,33 +163,6 @@ class ParseJson:
 
         return name_dict
 
-    def replace_profile(self):
-        """Replace sensitive info in profile.json that Anonymize can't replace """
-
-        try:
-            json_file = self.input_folder / 'profile.json'
-            with json_file.open(encoding="utf8") as f:
-                data = json.load(f)
-
-            file = json.dumps(data)
-
-            # Replace bio and gender info
-            bio = re.findall(re.compile("biography\": \"(.*?)\""), file)
-            gender = re.findall(re.compile("gender\": \"(.*?)\""), file)
-
-            if len(bio) >= 1:
-                file = file.replace(bio[0], '__bio')
-            if len(gender) >= 1:
-                file = file.replace(gender[0], '__gender')
-
-            # Save files
-            df = json.loads(file)
-            with json_file.open('w', encoding="utf8") as outfile:
-                json.dump(df, outfile)
-
-        except FileNotFoundError:
-            pass
-
     @staticmethod
     def mingle(text: str) -> str:
         """ Creates scrambled version with letters and numbers of entered word """
@@ -255,8 +218,10 @@ def main():
     output_folder.mkdir(parents=True, exist_ok=True)
 
     parser = ParseJson(input_folder, output_folder)
-    parser.create_keys()
+    key_dict = parser.create_keys()
 
+    key_series = pd.Series(key_dict, name='subt')
+    key_series.to_csv(output_folder / 'keys.csv', index_label='id', header=True)
 
 if __name__ == '__main__':
     main()
