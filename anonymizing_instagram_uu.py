@@ -3,7 +3,7 @@ from pathlib import Path, PurePath
 import re
 from zipfile import ZipFile
 import pandas as pd
-from anonymize import Anonymize
+from uunonymous import Anonymize
 import time
 import progressbar
 import logging
@@ -119,7 +119,7 @@ class AnonymizeInstagram:
         except FileNotFoundError:
             pass
 
-    def get_key_file(self) -> Path:
+    def create_key_file(self) -> Path:
         """ Write sensitive information and coded labels from json files to csv file"""
 
         parser = ParseJson(self.unpacked, self.output_folder)
@@ -132,6 +132,9 @@ class AnonymizeInstagram:
             key_dict = {**temp_key_dict, **part_dict}
         else:
             key_dict = parser.create_keys()
+
+        # Add regex pattern to recognize and replace links to other users profiles
+        key_dict['r#https?:.*instagram.com.*'] = '__url'
 
         # hash name of package owner in name output file
         name, timestamp = self.get_name_time()
@@ -162,7 +165,7 @@ class AnonymizeInstagram:
                 continue
 
         # Extract sensitive info and create key file for remaining json files
-        key_file = self.get_key_file()
+        key_file = self.create_key_file()
 
         return key_file
 
@@ -195,8 +198,6 @@ class AnonymizeInstagram:
         key_file = self.preprocess_json()
 
         self.logger.info(f"Pseudonymizing {self.unpacked.name}...")
-
-        # TODO: add pat_url = r'https?:.*instagram.com.*' to replace urls:directly call in Anonymize method?
 
         # images = BlurImages(self.unpacked)
         # images.blur_images()
