@@ -47,13 +47,7 @@ class AnonymizeInstagram:
                     elif index > 0:
                         self.logger.info(f'Extracting files for {zip_file} in {self.output_folder}'
                                          f'; replace existing files with name+suffix {index - 1}')
-                        try:
-                            timestamp = r'_[0-9]{8}'
-                            sep = re.findall(timestamp, str(self.zip_file.stem))[0]
-                        except IndexError:
-                            timestamp = r'[0-9]{8}'
-                            sep = re.findall(timestamp, str(self.zip_file.stem))[0]
-                        name = str(self.zip_file.stem).split(sep)[0] + sep
+                        name = self.get_name_time()[0] + self.get_name_time()[1]
 
                         with ZipFile(zip_file, 'r') as zipObj:
                             listOfFileNames = zipObj.namelist()
@@ -78,14 +72,7 @@ class AnonymizeInstagram:
         """Extract data package to output folder """
         self.logger.info(f'Extracting zipfile {self.zip_file}...')
 
-        try:
-            timestamp = r'_[0-9]{8}'
-            sep = re.findall(timestamp, str(self.zip_file.stem))[0]
-        except IndexError:
-            timestamp = r'[0-9]{8}'
-            sep = re.findall(timestamp, str(self.zip_file.stem))[0]
-        name = str(self.zip_file.stem).split(sep)[0] + sep
-
+        name = self.get_name_time()[0] + self.get_name_time()[1]
         extracted = Path(self.output_folder, name)
         with ZipFile(self.zip_file, 'r') as zip:
             zip.extractall(extracted)
@@ -122,7 +109,7 @@ class AnonymizeInstagram:
     def create_key_file(self) -> Path:
         """ Write sensitive information and coded labels from json files to csv file"""
 
-        parser = ParseJson(self.unpacked, self.output_folder)
+        parser = ParseJson(self.unpacked, self.output_folder, self.get_name_time()[0], self.get_name_time()[1])
 
         if self.ptp:
             self.logger.info(f'Add keys from participants file {self.ptp}')
@@ -139,7 +126,7 @@ class AnonymizeInstagram:
         # hash name of package owner in name output file
         name, timestamp = self.get_name_time()
         sub = key_dict[name]
-        outfile = self.output_folder / f'keys_{sub}_{timestamp}.csv'
+        outfile = self.output_folder / f'keys{sub}_{timestamp}.csv'
 
         # write keys to csv file as input for anonymizeUU package
         key_series = pd.Series(key_dict, name='subt')
@@ -185,9 +172,9 @@ class AnonymizeInstagram:
         """Retrieve owners name and timestamp from data package filename"""
 
         patt = r'_?[0-9]{8}'
-        timestamp = re.findall(patt, str(self.unpacked.name))[0]
+        timestamp = re.findall(patt, str(self.zip_file.stem))[0]
 
-        name = str(self.unpacked.name).split(timestamp)[0]
+        name = str(self.zip_file.stem).split(timestamp)[0]
 
         return name,timestamp
 
