@@ -41,8 +41,17 @@ class ParseJson:
         common_names = self.common_names()
         keys.append(common_names)
 
-        # Combine in one dict; replace name labels with hash code
+        # Combine separate dictionaries in one
         all_keys = ParseJson.format_dict(keys)
+
+        # Add package filename to key dict as the name of the output package needs to be hashed
+        if self.package_user not in key_dict:
+            key_dict.update({self.package_user: '__name'})
+            key_dict.update({self.input_folder.name: '__name'})
+        else:
+            key_dict.update({self.input_folder.name: '__name'})
+
+        #replace name labels with hash code
         hash_key_dict = {k: (self.mingle(k) if v == '__name' else v) for k, v in all_keys.items()}
         hash_key_dict[self.input_folder.name] = self.mingle(self.package_user)+self.timestamp
 
@@ -76,13 +85,6 @@ class ParseJson:
                 except:
                     for item in obj:
                         self.extract(item, key_dict)
-
-        # Add filename of output package to dictionary
-        if self.package_user not in key_dict:
-            key_dict.update({self.package_user: '__name'})
-            key_dict.update({self.input_folder.name: '__name'})
-        else:
-            key_dict.update({self.input_folder.name: '__name'})
 
         return key_dict
 
