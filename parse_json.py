@@ -13,11 +13,13 @@ import re
 class ParseJson:
     """ Extract sensitive information in jsonfiles"""
 
-    def __init__(self, input_folder: Path, output_folder: Path):
+    def __init__(self, input_folder: Path, output_folder: Path, package_user: str, timestamp: str):
         self.logger = logging.getLogger('anonymizing.parse_json')
         self.email = r'[\w\.-]+@[\w\.-]+'
         self.input_folder = input_folder
         self.output_folder = output_folder
+        self.package_user = package_user
+        self.timestamp = timestamp
         self.labels = self.get_labels()
 
     def create_keys(self) -> dict:
@@ -41,7 +43,8 @@ class ParseJson:
 
         # Combine in one dict; replace name labels with hash code
         all_keys = ParseJson.format_dict(keys)
-        hash_key_dict = {k: (self.mingle(v) if v == '__name' else v) for k, v in all_keys.items()}
+        hash_key_dict = {k: (self.mingle(k) if v == '__name' else v) for k, v in all_keys.items()}
+        hash_key_dict[self.input_folder.name] = self.mingle(self.package_user)+self.timestamp
 
         return hash_key_dict
 
@@ -73,6 +76,13 @@ class ParseJson:
                 except:
                     for item in obj:
                         self.extract(item, key_dict)
+
+        # Add filename of output package to dictionary
+        if self.package_user not in key_dict:
+            key_dict.update({self.package_user: '__name'})
+            key_dict.update({self.input_folder.name: '__name'})
+        else:
+            key_dict.update({self.input_folder.name: '__name'})
 
         return key_dict
 
