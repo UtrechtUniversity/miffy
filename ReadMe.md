@@ -50,7 +50,15 @@ After the repository is cloned and the data package is downloaded, create a new 
 When all preceding steps are taken, the data download packages can be pseudonimized. Run the program with arguments `-i` for input folder (e.g., 'input') and ` -o` output folder (e.g., 'output'):
 
 ```
-$ python anonymizing_instagram_uu.py -i input -o output
+$ python anonymizing_instagram_uu.py [OPTIONS]
+
+Options:
+  --input_folder, -i  PATH  path to folder containing zipfiles
+  --output_folder, -o PATH  path to folder where files will be unpacked
+  --log_file, -l  PATH  path to log file
+  --ptp, -p  PATH path to participants list to use corresponding anonymization codes
+  --cap, replace capitalized names only 
+
 ```
 
 An overview of the program's workflow is shown below:
