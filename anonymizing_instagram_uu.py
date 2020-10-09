@@ -11,7 +11,6 @@ import itertools
 from parse_json import ParseJson
 from typing import Union
 import json
-import hashlib
 from blur_images import BlurImages
 from blur_videos import BlurVideos
 
@@ -109,7 +108,8 @@ class AnonymizeInstagram:
     def create_key_file(self) -> Path:
         """ Write sensitive information and coded labels from json files to csv file"""
 
-        parser = ParseJson(self.unpacked, self.output_folder, self.get_name_time()[0], self.get_name_time()[1])
+        name, timestamp = self.get_name_time()
+        parser = ParseJson(self.unpacked, self.output_folder, name, timestamp)
 
         if self.ptp:
             self.logger.info(f'Add keys from participants file {self.ptp}')
@@ -186,11 +186,11 @@ class AnonymizeInstagram:
 
         self.logger.info(f"Pseudonymizing {self.unpacked.name}...")
 
-        # images = BlurImages(self.unpacked)
-        # images.blur_images()
-        #
-        # videos = BlurVideos(self.unpacked)
-        # videos.blur_videos()
+        images = BlurImages(self.unpacked)
+        images.blur_images()
+
+        videos = BlurVideos(self.unpacked)
+        videos.blur_videos()
 
         if self.cap:
             anonymize_csv = Anonymize(key_file, use_word_boundaries=True)
