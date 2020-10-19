@@ -17,7 +17,7 @@ class BlurImages:
     def blur_images(self):
         """Blur text and faces in images in given folder """
 
-        self.logger.info(f'Blurring photos of data package {self.data_package}---')
+        self.logger.info(f'Blurring photos in {self.data_package}...')
 
         jpg_list = list(self.data_package.rglob('*.jpg'))
 

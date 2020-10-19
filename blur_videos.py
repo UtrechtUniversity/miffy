@@ -18,7 +18,7 @@ class BlurVideos:
     def blur_videos(self):
         """Blur text and faces in videos in given folder """
 
-        self.logger.info("Blurring videos (can take a while)...")
+        self.logger.info(f'Blurring videos in {self.data_package} (can take a while)...')
 
         mp4_list = list(self.data_package.rglob('*.mp4'))
 
