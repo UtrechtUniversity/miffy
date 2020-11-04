@@ -11,6 +11,8 @@ import itertools
 from parse_json import ParseJson
 from typing import Union
 import json
+import zipfile
+import shutil
 from blur_images import BlurImages
 from blur_videos import BlurVideos
 
@@ -47,16 +49,24 @@ class AnonymizeInstagram:
                         self.logger.info(f'Extracting files for {zip_file} in {self.output_folder}'
                                          f'; replace existing files with name+suffix {index - 1}')
                         name = self.get_name_time()[0] + self.get_name_time()[1]
+                        unpacked = Path(self.output_folder, name)
 
-                        with ZipFile(zip_file, 'r') as zipObj:
-                            listOfFileNames = zipObj.namelist()
-                            unpacked = Path(self.output_folder, name)
+                        if zipfile.is_zipfile(zip_file):
+                            with ZipFile(zip_file, 'r') as zipObj:
+                                listOfFileNames = zipObj.namelist()
+                                for fileName in listOfFileNames:
+                                    if fileName.endswith('.json'):
+                                        if Path(unpacked, fileName).is_file():
+                                            p = Path(unpacked, fileName)
+                                            p.replace(Path(unpacked, f"{p.stem}_{index - 1}{p.suffix}"))
+                                        zipObj.extract(fileName, unpacked)
+                        else:
+                            listOfFileNames = list(Path(zip_file).glob('*.json'))
                             for fileName in listOfFileNames:
-                                if fileName.endswith('.json'):
-                                    if Path(unpacked, fileName).is_file():
-                                        p = Path(unpacked, fileName)
-                                        p.replace(Path(unpacked, f"{p.stem}_{index - 1}{p.suffix}"))
-                                    zipObj.extract(fileName, unpacked)
+                                if Path(unpacked, fileName.name).is_file():
+                                    p = Path(unpacked, fileName.name)
+                                    p.replace(Path(unpacked, f"{p.stem}_{index - 1}{p.suffix}"))
+                                shutil.copy(fileName, unpacked)
             else:
                 self.logger.warning('Can not extract {self.zip_file}, do nothing')
                 unpacked = ' '
@@ -73,8 +83,13 @@ class AnonymizeInstagram:
 
         name = self.get_name_time()[0] + self.get_name_time()[1]
         extracted = Path(self.output_folder, name)
-        with ZipFile(self.zip_file, 'r') as zip:
-            zip.extractall(extracted)
+
+        if zipfile.is_zipfile(self.zip_file):
+            with ZipFile(self.zip_file, 'r') as zip:
+                zip.extractall(extracted)
+        else:
+            self.logger.warning(f'{self.zip_file} not compressed: copying package to {extracted}')
+            shutil.copytree(Path(self.zip_file), extracted)
 
         return extracted
 
@@ -120,13 +135,21 @@ class AnonymizeInstagram:
         else:
             key_dict = parser.create_keys()
 
+        if key_dict[name].startswith("__"):
+            key_dict[self.unpacked.name] = key_dict[name][2:] + timestamp
+        else:
+            key_dict[self.unpacked.name] = key_dict[name] + timestamp
+
         # Add regex pattern to recognize and replace links to other users profiles
-        key_dict['r#https?:.*instagram.com.*'] = '__url'
+        key_dict['r#(?<!\d)\d{9,10}(?!\d)'] = '__phone'
+        key_dict['r#[0-9]{2}\-[0-9]{8}'] = '__phone'
+        key_dict['r#https:\/\/scontent.*?instagram.com\/.*?(?=["\s,}])'] = '__url'
+        key_dict['r#https:\/\/www.*?instagram.com\/.*?(?=["\s,}])'] = '__url'
 
         # hash name of package owner in name output file
-        name, timestamp = self.get_name_time()
-        sub = key_dict[name]
-        outfile = self.output_folder / f'keys{sub}_{timestamp}.csv'
+        sub = key_dict[self.unpacked.name]
+
+        outfile = self.output_folder / f'keys_{sub}.csv'
 
         # write keys to csv file as input for anonymizeUU package
         key_series = pd.Series(key_dict, name='subt')
@@ -240,7 +263,7 @@ def main():
                         default="log_anonym_insta.txt")
     parser.add_argument('--ptp', '-p', default=None,
                         help="Enter path to participants list to use corresponding anonymization codes")
-    parser.add_argument('--cap', default=False, action='store_true',
+    parser.add_argument('--cap', '-c', default=False, action='store_true',
                         help="Replace capitalized names only (i.e., replacing 'Ben' but not 'ben')")
 
     args = parser.parse_args()

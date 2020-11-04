@@ -46,13 +46,12 @@ class ParseJson:
 
         #replace name labels with hash code
         hash_key_dict = {k: (self.mingle(k) if v == '__name' else v) for k, v in all_keys.items()}
-        hash_key_dict[self.input_folder.name] = self.mingle(self.package_user)+self.timestamp
 
         return hash_key_dict
 
     def extract(self, obj, key_dict: dict) -> dict:
         """Recursively search for values of key in JSON tree."""
-
+        exceptions = ['created_at', 'instagram', 'mp4_size', 'webp_size', 'height', 'frames']
         if isinstance(obj, dict):
             for k, v in obj.items():
                 if v:
@@ -66,9 +65,11 @@ class ParseJson:
                             elif self.check_phone(v):
                                 key_dict[v] = '__phonenumber'
                             elif self.check_name(v):
-                                key_dict[v] = '__name'
+                                if v not in exceptions:
+                                    key_dict[v] = '__name'
                         elif self.check_name(k) and self.check_datetime(v):
-                            key_dict[k] = '__name'
+                            if k not in exceptions:
+                                key_dict[k] = '__name'
         elif isinstance(obj, list):
             if obj:
                 try:

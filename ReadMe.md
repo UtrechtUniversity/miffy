@@ -24,7 +24,7 @@ $ cd miffy
 # Install dependencies
 pip install -r requirements.txt
 ```
-N.B. When experiencing difficulties with installing torch, have a look at the [PyTorch website](https://pytorch.org/) for more information.
+N.B. When experiencing difficulties with installing torch, have a look at the [PyTorch website](https://pytorch.org/) for more information. When issues arise concerning the Anonymize software, make sure that no prior version is installed (```$ pip uninstall anonymize_UU``` and/or ```$ pip uninstall anonymoUUs```).
 
 ### Download data package
 
@@ -36,17 +36,18 @@ To download your Instagram data package:
 4. Enter your email adress and click *Next*
 5. Enter your password and click *Request download*
 
-Make sure that the data download package is saved as **username_YYYYMMDD.zip** (i.e., Instagram handle and date of download).
+Instagram will deliver your data in a compressed zip folder with format **username_YYYYMMDD.zip** (i.e., Instagram handle and date of download). For Mac users this might be different, so make sure to check that all provided files are zipped into one folder with the name **username_YYYYMMDD.zip**.
 
 ### Input folder
 
-After the repository is cloned and the data package is downloaded, create a new folder within the cloned repository (e.g., 'input'). Here, the following files need to be saved:
-* **Data package**: All necessary zipped data download packages (username_YYYYMMDD.zip)
-* **First names file**: A list with the most common (Dutch) names (Firstnames_NL.lst)
+After the repository is cloned and the data package is downloaded, create a new folder within the cloned repository (e.g., 'input'). This folder is used to store all Instagram data packages:
+* **Data package**: All necessary *zipped* data download packages (username_YYYYMMDD.zip)
+
+Before you can run the software, you need to make sure that the main repository folder contains the following items:
 * **Facial blurring software**: The *frozen_east_text_detection.pb* software, necessary for the facial blurring of images and videos, can be downloaded from [GitHub](https://github.com/oyyd/frozen_east_text_detection.pb) 
 * **Participant file**\*: An overview of all participants' usernames and participant IDs (e.g., participants.csv)
 
-**\*** N.B. Only relevant for participant based studies with *predefined* participant IDs. The participant list needs to be saved as a csv file containing 2 columns; the first being the original instagram handles (e.g., janjansen) and the second the participant IDs (e.g., PP001).
+**\*** N.B. Only relevant for participant based studies with *predefined* participant IDs. This file can have whatever name you prefer, as long as it is saved as .csv and contains 2 columns; the first being the original instagram handles (e.g., janjansen) and the second the participant IDs (e.g., PP001).
 
 ## Run software
 
@@ -56,11 +57,11 @@ When all preceding steps are taken, the data download packages can be pseudonimi
 $ python anonymizing_instagram_uu.py [OPTIONS]
 
 Options:
-  --input_folder, -i  PATH  path to folder containing zipfiles (e.g., input)
-  --output_folder, -o PATH  path to folder where files will be unpacked and pseudonimized (e.g., output)
-  --log_file, -l  PATH  path to log file
-  --ptp, -p  PATH path to participants list to use corresponding participant IDs (e.g., input/participants.csv)
-  --cap, replace capitalized names only (default = False)
+  -i  path to folder containing zipfiles (e.g., -i input)
+  -o  path to folder where files will be unpacked and pseudonimized (e.g., -o output)
+  -l  path to log file
+  -p  path to participants list to use corresponding participant IDs (e.g., -p participants.csv)
+  -c  replace capitalized names only (when not entering this option, the default = False; not case sensitive) (e.g., -c)
 
 ```
 
