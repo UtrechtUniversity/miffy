@@ -174,6 +174,10 @@ class AnonymizeInstagram:
                 self.logger.warning(f"Could not delete {json_file}, no such file")
                 continue
 
+        folder_to_rem = Path(self.unpacked, '__MACOSX')
+        if folder_to_rem.exists():
+            shutil.rmtree(folder_to_rem)
+
         # Extract sensitive info and create key file for remaining json files
         key_file = self.create_key_file()
 
@@ -207,11 +211,11 @@ class AnonymizeInstagram:
         self.logger.info(f"Preprocess {self.unpacked.name}...")
         key_file = self.preprocess_json()
 
-        images = BlurImages(self.unpacked)
-        images.blur_images()
-
-        videos = BlurVideos(self.unpacked)
-        videos.blur_videos()
+        # images = BlurImages(self.unpacked)
+        # images.blur_images()
+        #
+        # videos = BlurVideos(self.unpacked)
+        # videos.blur_videos()
 
         self.logger.info(f"Pseudonymizing text files in {self.unpacked.name}...")
 
