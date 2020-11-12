@@ -145,6 +145,7 @@ class AnonymizeInstagram:
         key_dict['r#[0-9]{2}\-[0-9]{8}'] = '__phone'
         key_dict['r#https:\/\/scontent.*?instagram.com\/.*?(?=["\s,}])'] = '__url'
         key_dict['r#https:\/\/www.*?instagram.com\/.*?(?=["\s,}])'] = '__url'
+        key_dict['r#[\w\.-]+@[\w\.-]+'] = '__email'
 
         # hash name of package owner in name output file
         sub = key_dict[self.unpacked.name]
