@@ -83,7 +83,7 @@ The Miffy project is executed by Martine de Vos, Laura Boeschoten and Roos Voorv
 
 ## License
 
-This project is licensed under ...
+The code in this project is licensed with MIT.
 
 
 ## Acknowledgments
