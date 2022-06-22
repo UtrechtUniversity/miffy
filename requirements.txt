@@ -1,6 +1,6 @@
 anonymoUUs==0.0.1
 facenet-pytorch==2.2.9
-numpy==1.17.2
+numpy==1.22.0
 opencv-python==4.2.0.34
 pandas==0.25.1
 pathlib==1.0.1
